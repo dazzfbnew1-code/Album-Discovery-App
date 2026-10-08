@@ -3141,7 +3141,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (settingMusicRoot) settingMusicRoot.value = configData.music_root || "";
       loadConfiguredDrives();
       if (settingFolderStructure) settingFolderStructure.value = configData.folder_structure || "artist_album_year";
-      if (settingConcurrencySelect) settingConcurrencySelect.value = String(configData.download_concurrency || 3);
+      if (settingConcurrencySelect) settingConcurrencySelect.value = String(configData.download_concurrency || 4);
       if (settingSaveLrc) settingSaveLrc.checked = Boolean(configData.save_lrc_lyrics);
       if (settingEmbedCover) settingEmbedCover.checked = configData.embed_cover_art !== false;
       if (settingSaveCoverJpg) settingSaveCoverJpg.checked = configData.save_cover_jpg !== false;
@@ -3417,7 +3417,7 @@ document.addEventListener("DOMContentLoaded", () => {
       audio_quality: settingQualitySelect.value,
       music_root: settingMusicRoot.value,
       folder_structure: settingFolderStructure ? settingFolderStructure.value : "artist_album_year",
-      download_concurrency: settingConcurrencySelect ? parseInt(settingConcurrencySelect.value, 10) : 3,
+      download_concurrency: settingConcurrencySelect ? parseInt(settingConcurrencySelect.value, 10) : 4,
       save_lrc_lyrics: settingSaveLrc ? settingSaveLrc.checked : false,
       embed_cover_art: settingEmbedCover ? settingEmbedCover.checked : true,
       save_cover_jpg: settingSaveCoverJpg ? settingSaveCoverJpg.checked : true,
@@ -3597,7 +3597,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const activeThreads = active.active_threads ? Object.values(active.active_threads) : [];
         let parallelStreamsHtml = "";
 
-        const concurrencyLimit = active.concurrency || (configData && configData.download_concurrency) || (settingConcurrencySelect ? parseInt(settingConcurrencySelect.value, 10) : 3) || 3;
+        const concurrencyLimit = active.concurrency || (configData && configData.download_concurrency) || (settingConcurrencySelect ? parseInt(settingConcurrencySelect.value, 10) : 4) || 4;
         const displayStreams = activeThreads.length;
         const engineTitle = concurrencyLimit > 1 
           ? `⚡ ${concurrencyLimit}x Parallel Turbo Engine` 

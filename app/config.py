@@ -19,7 +19,7 @@ DEFAULT_CONFIG = {
     "show_local_library": False,
     "audio_quality": "320k",
     "folder_structure": "artist_album_year",
-    "download_concurrency": 3,
+    "download_concurrency": 4,
     "save_lrc_lyrics": False,
     "embed_cover_art": True,
     "save_cover_jpg": True,
@@ -49,7 +49,7 @@ def load_config() -> dict:
                     try:
                         cfg["download_concurrency"] = max(1, min(10, int(cfg["download_concurrency"])))
                     except (ValueError, TypeError):
-                        cfg["download_concurrency"] = 3
+                        cfg["download_concurrency"] = 4
 
                 # Multi-drive synchronization
                 single_root = cfg.get("music_root", DEFAULT_DOWNLOAD_DIR)
