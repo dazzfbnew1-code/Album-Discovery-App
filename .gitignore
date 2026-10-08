@@ -47,3 +47,4 @@ PROMOTE_TO_STABLE.bat
 promote_stable.py
 scripts/
 ui/js/modules/
+HOW_UPDATES_WORK.txt
