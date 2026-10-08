@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Album Discovery Station — High-Precision Scanner & Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/x-icon" href="app_icon.ico" />
+  <link rel="shortcut icon" href="app_icon.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app-root">
+    <!-- Top Station Header (Single Row) -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">ALBUM DISCOVERY</span>
+          <span class="brand-badge">STUDIO</span>
+        </div>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="header-search">
+        <div class="search-input-box">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="omniSearchInput" placeholder="Search any artist, album, or career discography..." autocomplete="off" />
+          <button id="searchClearBtn" class="search-clear-btn hidden" title="Clear Search">✕</button>
+        </div>
+      </div>
+
+      <!-- Action Tools -->
+      <div class="header-actions">
+        <button id="btnHeaderPlayerToggle" class="hdr-btn player-hdr-btn" title="Show / Minimize Music Player">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M9 18V5l12-2v13"></path>
+            <circle cx="6" cy="18" r="3"></circle>
+            <circle cx="18" cy="16" r="3"></circle>
+          </svg>
+          <span>Player</span>
+        </button>
+
+        <button id="btnOpenDownloadsFolder" class="hdr-btn" title="Open Download Folder">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>Folder</span>
+        </button>
+
+        <button id="btnQueueToggle" class="hdr-btn queue-btn" title="View Download Queue">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>Queue</span>
+          <span id="queueBadge" class="queue-badge hidden">0</span>
+        </button>
+
+        <button id="btnAppMonitorToggle" class="hdr-btn monitor-pill-btn" title="Click to open App Activity & Resource Inspector">
+          <span class="monitor-pulse-dot"></span>
+          <span class="monitor-cpu-text" id="hdrMonitorCpu">CPU 0%</span>
+          <span class="monitor-sep">•</span>
+          <span class="monitor-ram-text" id="hdrMonitorRam">0 MB</span>
+        </button>
+
+        <button id="btnSettingsToggle" class="hdr-btn icon-only" title="Audio & Storage Settings">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- App Body: Sidebar + Main Workspace -->
+    <div class="app-body">
+      <!-- Left Navigation Sidebar -->
+      <aside class="station-sidebar" id="stationSidebar">
+        <div class="sidebar-scroll">
+          <!-- Discovery Group -->
+          <div class="sidebar-group">
+            <span class="sidebar-group-title">DISCOVERY</span>
+            <button class="nav-item active" data-type="genre" data-target="all">
+              <span class="nav-icon">🔥</span>
+              <span class="nav-label">Top 100 Albums</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="top_singles">
+              <span class="nav-icon">⚡</span>
+              <span class="nav-label">Top 100 Singles</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="pop">
+              <span class="nav-icon">✨</span>
+              <span class="nav-label">Trending Pop</span>
+            </button>
+            <button class="nav-item" data-type="special" data-target="surprise">
+              <span class="nav-icon">🎲</span>
+              <span class="nav-label">Surprise Crate</span>
+            </button>
+            <button class="nav-item" data-type="special" data-target="library">
+              <span class="nav-icon">💾</span>
+              <span class="nav-label">My Library</span>
+            </button>
+            <button class="nav-item nav-library-radio" id="navLibraryRadio" data-type="special" data-target="library_radio">
+              <span class="nav-icon">📻</span>
+              <span class="nav-label">Library DJ Radio</span>
+              <span class="sidebar-live-pill">DJ MIX</span>
+            </button>
+          </div>
+
+          <!-- ⏳ Time Machine Eras Group -->
+          <div class="sidebar-group">
+            <div class="sidebar-group-header">
+              <span class="sidebar-group-title">⏳ TIME MACHINE</span>
+              <button id="btnShuffleEra" class="btn-shuffle-sidebar" title="Jump to a Random Decade / Era">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                <span>Shuffle</span>
+              </button>
+            </div>
+            <button class="nav-item" data-type="genre" data-target="30s_40s">
+              <span class="nav-icon">🎺</span>
+              <span class="nav-label">30s & 40s Big Band</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="50s">
+              <span class="nav-icon">🎙️</span>
+              <span class="nav-label">50s Rock 'n' Roll</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="60s">
+              <span class="nav-icon">🎸</span>
+              <span class="nav-label">60s Psychedelic</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="70s">
+              <span class="nav-icon">🕺</span>
+              <span class="nav-label">70s Rock & Disco</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="80s">
+              <span class="nav-icon">📼</span>
+              <span class="nav-label">80s Synth & Pop</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="90s">
+              <span class="nav-icon">📻</span>
+              <span class="nav-label">90s Golden Era</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="2000s">
+              <span class="nav-icon">💿</span>
+              <span class="nav-label">2000s R&B / Rock</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="2010s">
+              <span class="nav-icon">🎧</span>
+              <span class="nav-label">2010s EDM & Indie</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="2020s">
+              <span class="nav-icon">✨</span>
+              <span class="nav-label">2020s Current Wave</span>
+            </button>
+          </div>
+
+          <!-- Genres Group -->
+          <div class="sidebar-group">
+            <div class="sidebar-group-header">
+              <span class="sidebar-group-title">GENRES</span>
+              <button id="btnShuffleGenre" class="btn-shuffle-sidebar" title="Pick a Random Genre">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+                <span>Shuffle</span>
+              </button>
+            </div>
+            <button class="nav-item" data-type="genre" data-target="rap">
+              <span class="nav-icon">🎤</span>
+              <span class="nav-label">Rap / Hip-Hop</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="dance">
+              <span class="nav-icon">🎧</span>
+              <span class="nav-label">Dance & EDM</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="rock">
+              <span class="nav-icon">🎸</span>
+              <span class="nav-label">Rock & Alt</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="rnb">
+              <span class="nav-icon">🎷</span>
+              <span class="nav-label">R&B / Soul</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="metal">
+              <span class="nav-icon">⚡</span>
+              <span class="nav-label">Metal & Heavy</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="electronic">
+              <span class="nav-icon">🎹</span>
+              <span class="nav-label">Electronic</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="indie">
+              <span class="nav-icon">🌿</span>
+              <span class="nav-label">Indie</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="jazz">
+              <span class="nav-icon">🎺</span>
+              <span class="nav-label">Jazz & Blues</span>
+            </button>
+            <button class="nav-item" data-type="genre" data-target="classical">
+              <span class="nav-icon">🎻</span>
+              <span class="nav-label">Classical</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Workspace -->
+      <main class="station-main">
+        <div class="section-title-row">
+          <div class="heading-wrap">
+            <h2 id="viewSectionTitle" class="section-heading">Top 100 Albums</h2>
+            <span id="viewSectionCount" class="section-count">Loading collection...</span>
+          </div>
+          
+          <div class="section-actions-right">
+            <div id="discographyCategoryPills" class="category-pills-row hidden">
+              <button class="cat-pill active" data-cat="albums" id="pillBtnAlbums">
+                <span class="pill-label">💿 Studio Albums</span>
+                <span class="pill-count" id="pillCountAlbums">0</span>
+              </button>
+              <button class="cat-pill" data-cat="compilations" id="pillBtnCompilations">
+                <span class="pill-label">📦 Compilations & Live</span>
+                <span class="pill-count" id="pillCountCompilations">0</span>
+              </button>
+              <button class="cat-pill" data-cat="eps" id="pillBtnEps">
+                <span class="pill-label">⚡ EPs & Mini-Albums</span>
+                <span class="pill-count" id="pillCountEps">0</span>
+              </button>
+              <button class="cat-pill" data-cat="singles" id="pillBtnSingles">
+                <span class="pill-label">🎵 Singles & Drops</span>
+                <span class="pill-count" id="pillCountSingles">0</span>
+              </button>
+              <button class="cat-pill" data-cat="all" id="pillBtnAll">
+                <span class="pill-label">🌐 All Releases</span>
+                <span class="pill-count" id="pillCountAll">0</span>
+              </button>
+            </div>
+            
+            <div id="viewModeToggle" class="view-mode-toggle" title="Switch layout">
+              <button id="btnViewGrid" class="view-mode-btn active" title="Cover Grid View">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+                <span>Grid</span>
+              </button>
+              <button id="btnViewList" class="view-mode-btn" title="Chronological List View">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                <span>List</span>
+              </button>
+            </div>
+
+            <div id="librarySearchWrap" class="library-search-wrap hidden">
+              <svg class="search-icon-small" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="librarySearchInput" class="library-search-input" placeholder="Search my library..." autocomplete="off" />
+              <button id="librarySearchClearBtn" class="library-search-clear hidden" title="Clear filter">✕</button>
+            </div>
+
+            <button id="btnLibraryRadioLaunch" class="btn-library-radio-launch hidden" title="Start Continuous DJ Radio across all your library albums">
+              <span class="radio-pulse-icon">📻</span>
+              <span>Start DJ Radio</span>
+            </button>
+
+            <button id="btnBatchDownload" class="btn-batch-download" title="Download all albums in this view">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span id="btnBatchDownloadText">📥 Download All</span>
+            </button>
+
+            <button id="btnRefreshView" class="btn-refresh-view" title="Pull latest live releases from chart servers">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+              <span>Refresh Live</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 🎯 Discography Gap Radar & Complete Collection Banner -->
+        <div id="artistGapBanner" class="artist-gap-banner hidden">
+          <div class="gap-banner-left">
+            <div class="gap-radar-badge" id="gapRadarBadge">🎯 Canon Radar</div>
+            <div class="gap-banner-info">
+              <div class="gap-banner-headline">
+                <span class="gap-banner-artist" id="gapBannerArtist">Artist Name</span>
+                <span class="gap-status-pill" id="gapStatusPill">0% Complete</span>
+              </div>
+              <div class="gap-progress-track">
+                <div class="gap-progress-fill" id="gapProgressBar" style="width: 0%"></div>
+              </div>
+              <p class="gap-banner-subtext" id="gapBannerSubtext">Comparing library against authentic studio album canon...</p>
+            </div>
+          </div>
+          <div class="gap-banner-actions">
+            <button id="btnCompleteCollection" class="btn-complete-collection">
+              <span class="btn-spark-icon">⚡</span>
+              <span id="btnCompleteCollectionText">Complete Collection</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Albums Grid View -->
+        <div id="albumsGrid" class="albums-grid"></div>
+
+        <!-- Chronological List View -->
+        <div id="albumsListContainer" class="albums-list-container hidden">
+          <table class="albums-table">
+            <thead>
+              <tr>
+                <th class="th-num">#</th>
+                <th class="th-cover">Cover</th>
+                <th class="th-title">Title</th>
+                <th class="th-artist">Artist</th>
+                <th class="th-year">Year</th>
+                <th class="th-tracks">Tracks</th>
+                <th class="th-type">Category</th>
+                <th class="th-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="albumsTableBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div id="paginationBar" class="pagination-bar hidden">
+          <div class="pagination-info">
+            <span id="paginationSummary">Showing 1–50 of 100 albums</span>
+          </div>
+
+          <div class="pagination-controls">
+            <button id="btnPrevPage" class="pagination-btn pagination-nav-btn" title="Previous Page">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              <span>Prev</span>
+            </button>
+            
+            <div id="paginationNumbers" class="pagination-numbers"></div>
+
+            <button id="btnNextPage" class="pagination-btn pagination-nav-btn" title="Next Page">
+              <span>Next</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+          </div>
+
+          <div class="pagination-per-page">
+            <span class="per-page-label">Per page:</span>
+            <select id="selectPageSize" class="page-size-select" title="Albums per page">
+              <option value="50" selected>50</option>
+              <option value="60">60</option>
+              <option value="100">100</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- State Containers -->
+        <div id="loadingIndicator" class="state-container hidden">
+          <div class="spinner-ring"></div>
+          <p>Scanning albums & metadata...</p>
+        </div>
+
+        <div id="emptyIndicator" class="state-container hidden">
+          <div class="empty-icon">💿</div>
+          <h3>No Albums Found</h3>
+          <p>Try searching for a different artist or check your filter settings.</p>
+        </div>
+      </main>
+    </div>
+
+    <!-- Inspect Side Drawer (Quick Interactive Tracklist & Audition Station) -->
+    <div id="inspectDrawerBackdrop" class="drawer-backdrop hidden"></div>
+    <aside id="inspectDrawer" class="inspect-drawer hidden">
+      <div class="drawer-header">
+        <div class="drawer-header-left">
+          <img id="drawerCoverImg" src="" alt="Album Cover" class="drawer-cover-img" />
+          <div class="drawer-title-meta">
+            <span id="drawerTypeBadge" class="card-type-badge badge-type-album">💿 Studio LP</span>
+            <h3 id="drawerAlbumTitle" class="drawer-title">Album Title</h3>
+            <p id="drawerArtistName" class="drawer-artist">Artist Name</p>
+          </div>
+        </div>
+        <div class="drawer-header-actions">
+          <button id="drawerExpandFullBtn" class="drawer-action-btn" title="Open Full Album Studio Modal">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            <span>Full Hub</span>
+          </button>
+          <button id="drawerCloseBtn" class="drawer-close-btn" title="Close Drawer">✕</button>
+        </div>
+      </div>
+
+      <div class="drawer-stats-bar">
+        <span id="drawerYear">📅 1994</span>
+        <span id="drawerTracksCount">🎵 12 Tracks</span>
+        <span id="drawerTotalDuration">⏱️ —</span>
+        <span id="drawerLabel">🏷️ Studio Release</span>
+      </div>
+
+      <div class="drawer-toolbar">
+        <button id="drawerPlayAllAuditionBtn" class="btn-drawer-play" title="Play 30s quick auditions sequentially">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span>Audition Tracks</span>
+        </button>
+        <button id="drawerDownloadAlbumBtn" class="btn-drawer-dl" title="Download this release">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span id="drawerDownloadBtnText">📥 Download Album</span>
+        </button>
+      </div>
+
+      <div class="drawer-tracklist-wrap">
+        <div id="drawerTracklistLoading" class="drawer-loading hidden">
+          <div class="spinner-ring"></div>
+          <p>Loading tracklist & waveforms...</p>
+        </div>
+        <div id="drawerTracklistContainer" class="drawer-tracklist"></div>
+      </div>
+    </aside>
+
+    <!-- Album Detail Modal (Ultra-Spacious 3-Tab Studio Hub) -->
+    <div id="albumModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <button id="modalCloseBtn" class="modal-close-btn" title="Close">✕</button>
+        
+        <!-- Hero Header -->
+        <div class="modal-header">
+          <div class="modal-cover-wrap">
+            <img id="modalCoverArt" src="" alt="Album Art" />
+          </div>
+          <div class="modal-info">
+            <span class="meta-tag" id="modalTypeBadge">STUDIO ALBUM</span>
+            <h1 id="modalAlbumTitle" class="modal-title">Album Title</h1>
+            <h2 id="modalArtistName" class="modal-artist" title="Click to view artist discography">Artist Name</h2>
+            
+            <div class="modal-badges">
+              <span class="spec-badge year-badge" id="modalYearBadge">📅 2024</span>
+              <span class="spec-badge" id="modalTracksCount">🎵 12 Tracks</span>
+              <span class="spec-badge" id="modalGenreBadge">⚡ Pop</span>
+              <span class="spec-badge label-badge" id="modalLabelBadge" title="Record Label">🏷️ Studio Release</span>
+              <span class="spec-badge barcode-badge" id="modalBarcodeBadge" title="Catalog UPC">📦 UPC: —</span>
+            </div>
+
+            <div class="modal-actions">
+              <button id="modalPlayFullAlbumBtn" class="btn-play-full" title="Stream all full-length songs in high quality">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span>Play Full Album</span>
+              </button>
+
+              <button id="modalLyricsHeaderBtn" class="btn-lyrics-action" title="View live synchronized lyrics for this album">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>Lyrics</span>
+              </button>
+
+              <button id="modalStartFlowBtn" class="btn-flow-action" title="Start endless discovery flow from this record">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M16.2 7.8l-2 6.4-6.4 2 2-6.4z"></path>
+                </svg>
+                <span>Discovery Flow</span>
+              </button>
+
+              <button id="modalDownloadAlbumBtn" class="btn-download-album">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span id="modalDownloadBtnText">Download Album</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Segmented 4-Tab Controller -->
+        <div class="modal-tabs-bar">
+          <button class="modal-tab-btn active" data-tab="tracks">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+            <span>Tracklist (<span id="modalTracklistTabCount">0</span>)</span>
+          </button>
+          <button class="modal-tab-btn" data-tab="lyrics">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            <span>Lyrics</span>
+          </button>
+          <button class="modal-tab-btn" data-tab="story">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            <span>Story & Liner Notes</span>
+          </button>
+          <button class="modal-tab-btn" data-tab="similar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><polygon points="12 8 8 12 12 16 16 12 12 8"></polygon></svg>
+            <span>Companion Masterpieces</span>
+          </button>
+        </div>
+
+        <!-- Modal Tab Panes Body -->
+        <div class="modal-tab-content-wrap">
+          <!-- Pane 1: Tracklist -->
+          <div id="modalPaneTracks" class="modal-tab-pane active">
+            <div class="tracklist-hdr-row">
+              <span class="th-num">#</span>
+              <span class="th-title">TITLE</span>
+              <span class="th-artist">ARTIST</span>
+              <span class="th-time">TIME</span>
+              <span class="th-action">PREVIEW & ACTIONS</span>
+            </div>
+            <div id="modalTracklist" class="tracklist-scroll-body"></div>
+          </div>
+
+          <!-- Pane 2: Lyrics Engine -->
+          <div id="modalPaneLyrics" class="modal-tab-pane hidden">
+            <div class="lyrics-container">
+              <div class="lyrics-header-bar">
+                <div class="lyrics-track-info">
+                  <span class="lyrics-label">NOW VIEWING</span>
+                  <span class="lyrics-track-title" id="lyricsTrackTitle">Select a track to load lyrics</span>
+                </div>
+                <button class="btn-refresh-lyrics" id="btnRefreshLyrics" title="Re-fetch lyrics from lrclib">🔄 Reload Lyrics</button>
+              </div>
+              <div class="lyrics-body" id="modalLyricsBody">
+                <div class="lyrics-placeholder">Click any track in the tracklist to load full lyrics.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pane 3: Story & Credits -->
+          <div id="modalPaneStory" class="modal-tab-pane hidden">
+            <div class="story-container">
+              <div class="story-meta-grid">
+                <div class="story-meta-card">
+                  <span class="story-meta-label">RECORD LABEL</span>
+                  <span class="story-meta-value" id="storyLabelVal">Official Studio Release</span>
+                </div>
+                <div class="story-meta-card">
+                  <span class="story-meta-label">ORIGINAL YEAR</span>
+                  <span class="story-meta-value" id="storyYearVal">2002</span>
+                </div>
+                <div class="story-meta-card">
+                  <span class="story-meta-label">CATALOG / UPC</span>
+                  <span class="story-meta-value mono" id="storyUpcVal">—</span>
+                </div>
+                <div class="story-meta-card">
+                  <span class="story-meta-label">TOTAL TRACKS</span>
+                  <span class="story-meta-value" id="storyTracksVal">0 Tracks</span>
+                </div>
+              </div>
+              <div class="story-liner-box">
+                <div class="story-liner-title">📖 ALBUM BACKSTORY & PRODUCTION NOTES</div>
+                <p id="modalBackstoryText" class="story-text">Loading liner notes and backstory...</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pane 4: Companion Masterpieces -->
+          <div id="modalPaneSimilar" class="modal-tab-pane hidden">
+            <div class="similar-container">
+              <p class="similar-subhead">Curated landmark albums and discography companions by related artists:</p>
+              <div class="similar-grid" id="modalSimilarGrid"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal (Advanced Workstation Control Panel) -->
+    <div id="settingsModal" class="modal-backdrop hidden">
+      <div class="modal-card settings-card">
+        <button id="settingsCloseBtn" class="modal-close-btn" title="Close">✕</button>
+        <div class="settings-header">
+          <div class="settings-header-icon">⚙️</div>
+          <div>
+            <h3>Workstation Control Panel</h3>
+            <p class="settings-sub">Configure storage hierarchy, parallel audio downloads, and discovery preferences</p>
+          </div>
+        </div>
+
+        <div class="settings-body">
+          <!-- SECTION 1: STORAGE & FOLDER HIERARCHY -->
+          <div class="settings-panel-section">
+            <div class="settings-section-title">
+              <span>📁 Storage & Library Hierarchy</span>
+            </div>
+
+            <div class="setting-group">
+              <div class="drives-header-row">
+                <label class="setting-label" style="margin-bottom: 0;">Connected Music Drives & Library Roots</label>
+                <button id="btnAddMusicDriveBtn" class="btn-add-drive" type="button" title="Add another music drive or folder path">
+                  <span>➕ Add Music Drive / Path</span>
+                </button>
+              </div>
+              <div class="drives-list-container" id="drivesListContainer">
+                <div class="drives-loading-placeholder">Loading configured drives...</div>
+              </div>
+              <div class="drives-hint-text">
+                💡 All listed drives are indexed simultaneously by the library scanner. The drive tagged <strong>⭐ Primary Target</strong> receives new album downloads.
+              </div>
+              <input type="hidden" id="settingMusicRoot" />
+            </div>
+
+            <div class="setting-grid-2">
+              <div class="setting-group">
+                <label class="setting-label">Folder Structure Template</label>
+                <select id="settingFolderStructure" class="setting-select">
+                  <option value="artist_album_year" selected>Artist / Album (Year) — Recommended</option>
+                  <option value="artist_album">Artist / Album</option>
+                  <option value="flat">Artist - Album (Year) [Single Folder]</option>
+                </select>
+              </div>
+
+              <div class="setting-group">
+                <label class="setting-label">Library Maintenance & Cover Repair</label>
+                <div style="display: flex; gap: 8px; width: 100%;">
+                  <button id="btnRescanLibraryNow" class="btn-rescan-settings" style="flex: 1;" title="Re-scan and index all audio on disk">
+                    <span>🔄 Re-Index</span>
+                  </button>
+                  <button id="btnBackfillCoversNow" class="btn-rescan-settings" style="flex: 1; background: rgba(139, 92, 246, 0.14); border-color: rgba(139, 92, 246, 0.35); color: #c4b5fd;" title="Automatically download missing cover.jpg art for all local albums">
+                    <span>🖼️ Repair Covers</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-toggles-grid">
+              <label class="chk-label">
+                <input type="checkbox" id="settingAutoRescan" checked />
+                <span>⚡ Auto-refresh library index immediately when downloads complete</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- SECTION 2: AUDIO QUALITY & PARALLEL TURBO ENGINE -->
+          <div class="settings-panel-section">
+            <div class="settings-section-title">
+              <span>⚡ Audio Quality & Parallel Turbo Engine</span>
+            </div>
+
+            <div class="setting-grid-2">
+              <div class="setting-group">
+                <label class="setting-label">Audio Quality / Codec</label>
+                <select id="settingQualitySelect" class="setting-select">
+                  <option value="320k" selected>MP3 320k — Master Quality (Recommended)</option>
+                  <option value="256k">MP3 256k — High Quality</option>
+                  <option value="192k">MP3 192k — Standard Quality</option>
+                  <option value="128k">MP3 128k — Compact Size</option>
+                  <option value="aac256">AAC 256k — iTunes Plus</option>
+                  <option value="ogg320">OGG 320k — Vorbis Master</option>
+                  <option value="opus160">OPUS 160k — Efficient Stream</option>
+                </select>
+              </div>
+
+              <div class="setting-group">
+                <label class="setting-label">Parallel Download Streams</label>
+                <select id="settingConcurrencySelect" class="setting-select">
+                  <option value="1">1 Stream — Sequential (Lowest CPU & RAM)</option>
+                  <option value="2">2 Streams — Gentle (Low CPU)</option>
+                  <option value="3" selected>3 Streams — 3x Turbo (Recommended • Low CPU)</option>
+                  <option value="4">4 Streams — 4x High Speed (Balanced)</option>
+                  <option value="5">5 Streams — 5x Fast (Moderate CPU)</option>
+                  <option value="6">6 Streams — 6x Super Turbo (Higher CPU)</option>
+                  <option value="8">8 Streams — 8x Hyper Turbo (Heavy CPU)</option>
+                  <option value="10">10 Streams — 10x Extreme Turbo (Max CPU & RAM)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="setting-toggles-grid" style="margin-top: 6px;">
+              <label class="chk-label">
+                <input type="checkbox" id="settingSaveLrc" />
+                <span>Save synchronized <code>.lrc</code> lyrics files alongside songs</span>
+              </label>
+
+              <label class="chk-label">
+                <input type="checkbox" id="settingEmbedCover" checked />
+                <span>Embed high-res front cover art (APIC) into audio tags</span>
+              </label>
+
+              <label class="chk-label">
+                <input type="checkbox" id="settingSaveCoverJpg" checked />
+                <span>Save standalone <code>cover.jpg</code> in album folder</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- SECTION 3: DJ RADIO WORKSTATION ENGINE -->
+          <div class="settings-panel-section">
+            <div class="settings-section-title">
+              <span>📻 Library DJ Radio Workstation Engine</span>
+            </div>
+
+            <div class="setting-grid-2">
+              <div class="setting-group">
+                <label class="setting-label">DJ Radio Queue Batch Size</label>
+                <select id="settingRadioBatchSize" class="setting-select">
+                  <option value="30">30 Tracks — Quick Session</option>
+                  <option value="60" selected>60 Tracks — Extended Mix</option>
+                  <option value="100">100 Tracks — Mega Marathon</option>
+                  <option value="150">150 Tracks — All-Day Station</option>
+                </select>
+              </div>
+
+              <div class="setting-group">
+                <label class="setting-label">Startup Landing Screen</label>
+                <select id="settingStartupView" class="setting-select">
+                  <option value="all" selected>Top 100 Landmark Albums (Default)</option>
+                  <option value="top_singles">Top 100 Singles & Drops</option>
+                  <option value="library">My Downloaded Library</option>
+                  <option value="surprise">Surprise Discovery Crate</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="setting-toggles-grid" style="margin-top: 6px;">
+              <label class="chk-label">
+                <input type="checkbox" id="settingRadioArtistSpacing" checked />
+                <span>Smart Artist Spacing (Guarantees high artist diversity, avoids consecutive tracks by same artist)</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- SECTION 4: DISCOVERY, PLAYER & LIVE LYRICS PREFERENCES -->
+          <div class="settings-panel-section">
+            <div class="settings-section-title">
+              <span>🎛️ Discovery, Player & Live Lyrics Preferences</span>
+            </div>
+
+            <div class="setting-grid-2">
+              <div class="setting-group">
+                <label class="setting-label">Discovery Album Limit</label>
+                <select id="settingDiscoveryLimit" class="setting-select">
+                  <option value="50">50 Albums (Compact)</option>
+                  <option value="100" selected>100 Albums (Full — Recommended)</option>
+                  <option value="150">150 Albums (Extended)</option>
+                  <option value="200">200 Albums (Deep Archive)</option>
+                  <option value="0">All Available Albums (No Limit)</option>
+                </select>
+              </div>
+
+              <div class="setting-group">
+                <label class="setting-label">Career Discography Filter Default</label>
+                <select id="settingDefaultDiscographyFilter" class="setting-select">
+                  <option value="albums" selected>💿 Studio Albums Only (Recommended)</option>
+                  <option value="all">🌐 All Releases (Albums, Singles, EPs & Live)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="setting-grid-2" style="margin-top: 10px;">
+              <div class="setting-group">
+                <label class="setting-label">Audio Crossfade Transition</label>
+                <div class="pill-toggle-group" id="crossfadePillGroup">
+                  <button type="button" class="pill-opt-btn" data-val="0">Off (0s)</button>
+                  <button type="button" class="pill-opt-btn" data-val="2">2s Quick</button>
+                  <button type="button" class="pill-opt-btn active" data-val="3">3s Smooth</button>
+                  <button type="button" class="pill-opt-btn" data-val="5">5s DJ Mix</button>
+                </div>
+                <input type="hidden" id="settingCrossfadeDuration" value="3" />
+              </div>
+            </div>
+
+            <div class="setting-toggles-grid" style="margin-top: 6px;">
+              <label class="chk-label">
+                <input type="checkbox" id="settingFilterJunk" checked />
+                <span>Filter out karaoke, tribute bands, ringtones & acoustic spam</span>
+              </label>
+
+              <label class="chk-label">
+                <input type="checkbox" id="settingAutoAdvance" checked />
+                <span>Auto-advance to next track in player / preview mode</span>
+              </label>
+
+              <label class="chk-label">
+                <input type="checkbox" id="settingCrossfade" checked />
+                <span>Smooth crossfade & waveform audition when scrubbing tracks</span>
+              </label>
+
+              <label class="chk-label">
+                <input type="checkbox" id="settingAutoOpenLyrics" />
+                <span>🎤 Auto-open scrolling lyrics panel when a song begins playing</span>
+              </label>
+
+              <label class="chk-label">
+                <input type="checkbox" id="settingTrackToasts" checked />
+                <span>🔔 Show toast notification when changing tracks</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <button id="btnSaveSettings" class="btn-save-settings">Save & Apply Changes</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⚡ APP ACTIVITY & RESOURCE INSPECTOR MODAL -->
+    <div id="appMonitorModal" class="modal-backdrop hidden">
+      <div class="modal-card monitor-inspector-card">
+        <button id="appMonitorCloseBtn" class="modal-close-btn" title="Close Diagnostics">✕</button>
+
+        <div class="monitor-modal-header">
+          <div class="monitor-header-left">
+            <div class="monitor-header-badge">
+              <span class="monitor-radar-ping">
+                <span class="ping-circle"></span>
+                <span class="ping-dot"></span>
+              </span>
+              <span>LIVE SYSTEM TELEMETRY</span>
+            </div>
+            <h3 class="monitor-header-title">Process Diagnostics & Telemetry Hub</h3>
+            <p class="monitor-header-sub">Isolated worker threads, engine activity, memory management and real-time backend pipeline</p>
+          </div>
+          <div class="monitor-header-meta">
+            <div class="meta-tech-pill" title="Process ID">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+              <span>PID</span>
+              <span id="monValPid" class="mono">—</span>
+            </div>
+            <div class="meta-tech-pill" title="System Runtime Uptime">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>UPTIME</span>
+              <span id="monValUptime" class="mono">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="monitor-modal-body">
+          <!-- 1. Performance Gauges -->
+          <div class="mon-section-hdr">
+            <div class="mon-hdr-title-wrap">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+              <span>HARDWARE PERFORMANCE & ENGINE FOOTPRINT</span>
+            </div>
+          </div>
+
+          <div class="mon-metrics-grid">
+            <div class="mon-metric-card">
+              <div class="mon-card-top">
+                <span class="mon-metric-label">CPU USAGE</span>
+                <svg class="mon-metric-icon cpu" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
+              </div>
+              <div class="mon-metric-val" id="monMetricCpu">0%</div>
+              <div class="mon-progress-bg">
+                <div class="mon-progress-bar" id="monBarCpu" style="width: 0%;"></div>
+              </div>
+              <span class="mon-metric-hint" id="monCpuHint">Active Python Process</span>
+            </div>
+
+            <div class="mon-metric-card">
+              <div class="mon-card-top">
+                <span class="mon-metric-label">APP RAM</span>
+                <svg class="mon-metric-icon ram" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h.01M10 12h.01M14 12h.01M18 12h.01"/></svg>
+              </div>
+              <div class="mon-metric-val" id="monMetricRam">0 MB</div>
+              <div class="mon-progress-bg">
+                <div class="mon-progress-bar ram" id="monBarRam" style="width: 0%;"></div>
+              </div>
+              <span class="mon-metric-hint" id="monRamHint">System: 0 GB Total</span>
+            </div>
+
+            <div class="mon-metric-card">
+              <div class="mon-card-top">
+                <span class="mon-metric-label">WORKER THREADS</span>
+                <svg class="mon-metric-icon threads" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+              </div>
+              <div class="mon-metric-val" id="monMetricThreads">0</div>
+              <div class="mon-progress-bg">
+                <div class="mon-progress-bar threads" id="monBarThreads" style="width: 20%;"></div>
+              </div>
+              <span class="mon-metric-hint">Background worker pool</span>
+            </div>
+
+            <div class="mon-metric-card">
+              <div class="mon-card-top">
+                <span class="mon-metric-label">AUDIO ENCODERS</span>
+                <svg class="mon-metric-icon encoders" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2v20M17 5v14M7 8v8M2 11v2M22 11v2"/></svg>
+              </div>
+              <div class="mon-metric-val" id="monMetricChildren">0 Idle</div>
+              <div class="mon-progress-bg">
+                <div class="mon-progress-bar proc" id="monBarChildren" style="width: 0%;"></div>
+              </div>
+              <span class="mon-metric-hint" id="monChildrenHint">Audio encoders idle</span>
+            </div>
+          </div>
+
+          <!-- 2. Real-Time Subsystems Status -->
+          <div class="mon-section-hdr" style="margin-top: 18px;">
+            <div class="mon-hdr-title-wrap">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+              <span>CORE SUBSYSTEM STATUS</span>
+            </div>
+          </div>
+
+          <div class="mon-subsystems-grid">
+            <div class="mon-subsystem-box" id="monBoxDownloader">
+              <div class="mon-subsystem-header">
+                <div class="mon-sub-icon-badge amber">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </div>
+                <div class="mon-sub-title-group">
+                  <span class="mon-sub-name">Download Engine</span>
+                  <span class="mon-status-pill idle" id="monDlStatusBadge"><span class="mon-pill-dot"></span>Idle</span>
+                </div>
+              </div>
+              <div class="mon-sub-body" id="monDlBody">
+                <div class="mon-sub-detail">No active downloads running in background.</div>
+              </div>
+            </div>
+
+            <div class="mon-subsystem-box" id="monBoxLibrary">
+              <div class="mon-subsystem-header">
+                <div class="mon-sub-icon-badge emerald">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <div class="mon-sub-title-group">
+                  <span class="mon-sub-name">Library Scanner</span>
+                  <span class="mon-status-pill active"><span class="mon-pill-dot"></span>Watching</span>
+                </div>
+              </div>
+              <div class="mon-sub-body" id="monLibBody">
+                <div class="mon-sub-detail">
+                  <div class="mon-sub-row">Owned Albums: <strong id="monLibCount">0</strong></div>
+                  <div class="mon-sub-muted" id="monLibPath">Root: —</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mon-subsystem-box" id="monBoxDb">
+              <div class="mon-subsystem-header">
+                <div class="mon-sub-icon-badge violet">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                </div>
+                <div class="mon-sub-title-group">
+                  <span class="mon-sub-name">SQLite Database</span>
+                  <span class="mon-status-pill active violet"><span class="mon-pill-dot"></span>WAL Mode</span>
+                </div>
+              </div>
+              <div class="mon-sub-body" id="monDbBody">
+                <div class="mon-sub-detail">
+                  <div class="mon-sub-row">File: <strong id="monDbName">discovery.db</strong></div>
+                  <div class="mon-sub-muted">Size: <span id="monDbSize">0 KB</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Live Activity Stream / Event Log -->
+          <div class="mon-section-hdr mon-console-hdr" style="margin-top: 18px;">
+            <div class="mon-hdr-title-wrap">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+              <span>LIVE ACTIVITY & EVENT FEED</span>
+            </div>
+            <div class="mon-console-tools">
+              <span class="mon-live-stream-badge">
+                <span class="mon-pulse-dot mini"></span>
+                <span>REAL-TIME FEED</span>
+              </span>
+              <button id="btnMonClearConsole" class="mon-console-btn" title="Clear console buffer">Clear</button>
+            </div>
+          </div>
+
+          <div class="mon-terminal-window">
+            <div class="mon-terminal-chrome">
+              <div class="mon-term-dots">
+                <span class="mon-dot red"></span>
+                <span class="mon-dot yellow"></span>
+                <span class="mon-dot green"></span>
+              </div>
+              <div class="mon-term-title">engine-telemetry.log</div>
+              <div class="mon-term-status">AUTO-SCROLL ACTIVE</div>
+            </div>
+            <div class="mon-log-console" id="monLogConsole">
+              <div class="mon-log-placeholder">Listening for application events...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Footer Actions -->
+        <div class="monitor-modal-footer">
+          <div class="mon-footer-left">
+            <button id="btnMonTrimMemory" class="btn-mon-action memory" title="Run Python garbage collection to release unneeded memory">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              <span>Trim Memory (Free RAM)</span>
+            </button>
+            <button id="btnMonRescanLibrary" class="btn-mon-action secondary" title="Trigger immediate background scan of music library">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>Rescan Library</span>
+            </button>
+          </div>
+          <button id="btnMonClose" class="btn-mon-close">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🚀 FIRST-TIME WELCOME & SETUP WIZARD MODAL -->
+    <div id="firstRunModal" class="modal-backdrop hidden">
+      <div class="modal-card onboarding-card">
+        <div class="onboarding-header">
+          <div class="onboarding-badge">INITIAL WORKSTATION SETUP</div>
+          <h2 class="onboarding-title">🎵 Welcome to Album Discovery Studio</h2>
+          <p class="onboarding-subtitle">Configure your music download location and audio preferences before you start exploring.</p>
+        </div>
+
+        <div class="onboarding-body">
+          <!-- 1. Music Download Folder -->
+          <div class="onboarding-section">
+            <div class="onboarding-section-title">
+              <span class="step-num">1</span>
+              <span>Where should downloaded albums be saved?</span>
+            </div>
+            <div class="path-picker-row">
+              <input type="text" id="wizardMusicRoot" class="setting-input" readonly />
+              <button id="btnWizardBrowseRoot" class="btn-browse">Browse Folder...</button>
+            </div>
+            <span class="onboarding-hint">Default is the portable <code>./Album Downloads</code> folder inside the app. You can choose any external drive or music folder.</span>
+          </div>
+
+          <!-- 2. Audio Quality Selection -->
+          <div class="onboarding-section">
+            <div class="onboarding-section-title">
+              <span class="step-num">2</span>
+              <span>Preferred Audio Quality</span>
+            </div>
+            <select id="wizardQualitySelect" class="setting-select">
+              <option value="320k" selected>MP3 320k — Master Quality (Recommended)</option>
+              <option value="256k">MP3 256k — High Quality</option>
+              <option value="192k">MP3 192k — Standard Quality</option>
+              <option value="128k">MP3 128k — Compact Size</option>
+              <option value="aac256">AAC 256k — iTunes Plus</option>
+            </select>
+          </div>
+
+          <!-- 3. Smart Preferences -->
+          <div class="onboarding-section">
+            <div class="onboarding-section-title">
+              <span class="step-num">3</span>
+              <span>Smart Discovery Preferences</span>
+            </div>
+            <div class="onboarding-toggles">
+              <label class="chk-label">
+                <input type="checkbox" id="wizardFilterJunk" checked />
+                <span>Filter out tribute bands, karaoke, and acoustic spam</span>
+              </label>
+              <label class="chk-label" style="margin-top: 10px;">
+                <input type="checkbox" id="wizardAutoAdvance" checked />
+                <span>Auto-advance previews when auditioning tracks</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="onboarding-footer">
+          <button id="btnWizardFinish" class="btn-wizard-finish">
+            <span>🚀 Save & Start Discovering Music</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Batch Download Review & Confirmation Modal -->
+    <div id="batchDownloadModal" class="modal-backdrop hidden">
+      <div class="batch-modal-card">
+        <div class="batch-modal-hdr">
+          <div class="batch-modal-title-wrap">
+            <div class="batch-icon">📥</div>
+            <div>
+              <h2 id="batchModalHeading" class="batch-heading">Batch Download Albums</h2>
+              <p id="batchModalSubheading" class="batch-sub">Review verified albums before queueing to library</p>
+            </div>
+          </div>
+          <button id="batchModalCloseBtn" class="modal-close-btn" title="Close">✕</button>
+        </div>
+
+        <div class="batch-selection-toolbar">
+          <label class="batch-select-all-label">
+            <input type="checkbox" id="batchSelectAllCheckbox" checked />
+            <span id="batchSelectAllText">Select All (0 selected)</span>
+          </label>
+          <span id="batchTotalTracksSummary" class="batch-tracks-badge">0 Albums</span>
+        </div>
+
+        <div id="batchAlbumsList" class="batch-albums-list">
+          <!-- Album list checkboxes dynamically rendered -->
+        </div>
+
+        <div class="batch-modal-footer">
+          <button id="btnCancelBatch" class="btn-batch-cancel">Cancel</button>
+          <button id="btnConfirmBatch" class="btn-batch-confirm">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span id="btnConfirmBatchText">Start Downloading (0 Albums)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Queue Drawer Side Panel -->
+    <div id="queueDrawer" class="queue-drawer hidden">
+      <div class="queue-header">
+        <div class="queue-header-title-row">
+          <h3>Download Queue</h3>
+          <div class="queue-header-actions">
+            <button id="btnClearQueueHistory" class="btn-queue-action" title="Clear Completed History">Clear History</button>
+            <button id="btnClearActiveQueue" class="btn-queue-action" title="Clear Pending Queue">Clear Pending</button>
+          </div>
+        </div>
+        <button id="queueCloseBtn" class="modal-close-btn">✕</button>
+      </div>
+      <div id="queueListBody" class="queue-body"></div>
+    </div>
+
+    <!-- Floating Toast Notification System -->
+    <div id="appToastContainer" class="toast-container"></div>
+
+    <!-- 🎵 FLOATING MINI PLAYER DOCK PILL (Appears when player HUD is minimized) -->
+    <div id="playerDockPill" class="player-dock-pill hidden" title="Click to Expand Full Player">
+      <div class="dock-pill-art">
+        <img id="dockPillCover" src="" alt="Album Art" />
+        <div class="dock-pill-eq" id="dockPillEq">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+      <div class="dock-pill-info" id="dockPillInfo">
+        <span id="dockPillTitle" class="dock-pill-title">Track Preview</span>
+        <span id="dockPillArtist" class="dock-pill-artist">Artist Name</span>
+      </div>
+      <div class="dock-pill-controls">
+        <button id="dockPillPlayPauseBtn" class="dock-pill-btn play" title="Play / Pause (Spacebar)">
+          <svg id="dockPillPlayIcon" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <svg id="dockPillPauseIcon" class="hidden" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+          </svg>
+        </button>
+        <button id="dockPillLyricsBtn" class="dock-pill-btn lyrics" title="View Track Lyrics">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+        <button id="dockPillRerollBtn" class="dock-pill-btn reroll hidden" title="Re-roll Fresh DJ Radio Mix">
+          🔀 Mix
+        </button>
+        <button id="dockPillExpandBtn" class="dock-pill-btn expand" title="Open Full Player">
+          ▲ Open
+        </button>
+        <button id="dockPillStopBtn" class="dock-pill-btn stop" title="Stop Audio & Close">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <!-- 🎧 STEALTH SMART FLOATING ISLAND MINI-PLAYER -->
+    <aside id="smartPlayerHud" class="smart-player-hud stealth">
+      <div class="hud-main">
+        <div class="hud-art-wrap">
+          <img id="playerCoverImg" src="" alt="Album Cover" class="hud-cover-img" />
+          <div class="hud-equalizer-bars" id="hudEqualizer">
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
+            <span class="eq-bar"></span>
+          </div>
+        </div>
+
+        <div class="hud-info">
+          <div class="hud-now-playing-tag">
+            <span class="pulse-dot"></span>
+            <span id="hudAlbumTitle">ALBUM PREVIEW</span>
+          </div>
+          <div class="hud-title" id="playerTrackTitle">Track Title</div>
+          <div class="hud-artist" id="playerArtistName">Artist Name</div>
+          
+          <div class="hud-scrubber-row">
+            <span class="time-label" id="currentTimeLabel">0:00</span>
+            <div class="scrub-bar" id="playerScrubBar">
+              <div class="scrub-fill" id="playerScrubFill"></div>
+            </div>
+            <span class="time-label" id="durationTimeLabel">0:00</span>
+          </div>
+        </div>
+
+        <div class="hud-controls">
+          <button class="ctrl-btn" id="prevTrackBtn" title="Previous Track">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="19 20 9 12 19 4 19 20"></polygon>
+              <line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"></line>
+            </svg>
+          </button>
+          
+          <button class="ctrl-btn play-main" id="playPauseBtn" title="Play / Pause (Spacebar)">
+            <svg id="hudPlayIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+            <svg id="hudPauseIcon" class="hidden" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="6" y="4" width="4" height="16"></rect>
+              <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+          </button>
+
+          <button class="ctrl-btn stop-main" id="stopBtn" title="Stop & Dismiss Player">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+            </svg>
+          </button>
+
+          <button class="ctrl-btn" id="nextTrackBtn" title="Next Track">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5 4 15 12 5 20 5 4"></polygon>
+              <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div class="hud-actions">
+          <button class="hud-btn-reroll hidden" id="hudRerollRadioBtn" title="Re-roll Fresh DJ Radio Mix (New Tracks from Library)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+            <span>Re-roll Mix</span>
+          </button>
+
+          <button class="hud-btn-lyrics" id="hudLyricsBtn" title="View Synchronized Lyrics for Now Playing Song">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Lyrics</span>
+          </button>
+
+          <div class="vol-wrap">
+            <svg class="vol-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <input type="range" class="vol-slider" id="playerVolumeSlider" min="0" max="1" step="0.01" value="1" />
+            <span id="playerVolumeLabel" class="vol-percent-label">100%</span>
+          </div>
+          <button class="hud-close-btn" id="hudDismissBtn" title="Minimize Player to Dock">▼</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <audio id="globalAudioPlayer" preload="none"></audio>
+  <audio id="standbyAudioPlayer" preload="none"></audio>
+  <script src="js/app.js"></script>
+</body>
+</html>

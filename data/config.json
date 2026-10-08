@@ -1,0 +1,27 @@
+{
+  "music_root": "H:\\",
+  "music_roots": [
+    "H:\\"
+  ],
+  "download_root": "H:\\",
+  "show_local_library": false,
+  "audio_quality": "320k",
+  "folder_structure": "artist_album_year",
+  "download_concurrency": 4,
+  "save_lrc_lyrics": false,
+  "embed_cover_art": true,
+  "save_cover_jpg": true,
+  "filter_junk": true,
+  "auto_advance_preview": true,
+  "crossfade_audio": true,
+  "crossfade_duration": 2,
+  "first_run_completed": true,
+  "auto_rescan_on_download": true,
+  "radio_batch_size": 60,
+  "radio_artist_spacing": true,
+  "auto_open_lyrics": false,
+  "show_track_toasts": true,
+  "default_startup_view": "all",
+  "default_discography_filter": "albums",
+  "discovery_album_limit": 100
+}

@@ -1,0 +1,1 @@
+"""Album Discovery App Package"""

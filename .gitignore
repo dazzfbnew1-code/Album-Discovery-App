@@ -1,0 +1,40 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# App local runtime databases & caches
+*.db
+*.db-shm
+*.db-wal
+data/*.db
+data/logs/
+data/cache/
+*.log
+
+# User music library & downloads
+Album Downloads/
+*.mp3
+*.m4a
+*.flac
+*.wav
+
+# Windows & Explorer artifacts
+Thumbs.db
+ehthumbs.db
+desktop.ini
+*.lnk
+
+# Packaging & archives
+*.zip
+*.zip.bak
+
+# IDE & Editor settings
+.idea/
+.vscode/
+*.swp
