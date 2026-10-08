@@ -39,7 +39,9 @@ desktop.ini
 .vscode/
 *.swp
 
-# Personal local configs & internal files
+# Personal local configs & developer tools (stay on PC only)
 data/config.json
 AGENTS.md
+PUSH_TO_GITHUB.bat
+scripts/
 ui/js/modules/
