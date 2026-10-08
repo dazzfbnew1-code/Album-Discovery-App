@@ -1,9 +1,9 @@
 {
-  "music_root": "H:\\",
+  "music_root": "Album Downloads",
   "music_roots": [
-    "H:\\"
+    "Album Downloads"
   ],
-  "download_root": "H:\\",
+  "download_root": "Album Downloads",
   "show_local_library": false,
   "audio_quality": "320k",
   "folder_structure": "artist_album_year",
@@ -14,8 +14,8 @@
   "filter_junk": true,
   "auto_advance_preview": true,
   "crossfade_audio": true,
-  "crossfade_duration": 2,
-  "first_run_completed": true,
+  "crossfade_duration": 3,
+  "first_run_completed": false,
   "auto_rescan_on_download": true,
   "radio_batch_size": 60,
   "radio_artist_spacing": true,

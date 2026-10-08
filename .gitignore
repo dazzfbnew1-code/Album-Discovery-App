@@ -38,3 +38,8 @@ desktop.ini
 .idea/
 .vscode/
 *.swp
+
+# Personal local configs & internal files
+data/config.json
+AGENTS.md
+ui/js/modules/
