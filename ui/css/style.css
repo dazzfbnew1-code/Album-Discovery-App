@@ -138,6 +138,17 @@ body {
   color: var(--accent-light);
 }
 
+.brand-version-pill {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 2px 6px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 4px;
+  color: #34d399;
+}
+
 /* Search Bar — Fluid Flex Center */
 .header-search {
   flex: 1;
@@ -2251,8 +2262,29 @@ body {
 .settings-footer {
   padding: 14px 28px 20px;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-version-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-version-note strong {
+  color: #34d399;
+}
+
+.settings-version-note .version-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
 }
 
 .btn-save-settings {
@@ -5223,7 +5255,8 @@ body {
 }
 
 @media (max-width: 1080px) {
-  .brand-badge {
+  .brand-badge,
+  .brand-version-pill {
     display: none;
   }
   .brand-title {

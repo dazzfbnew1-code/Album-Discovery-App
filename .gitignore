@@ -43,5 +43,7 @@ desktop.ini
 data/config.json
 AGENTS.md
 PUSH_TO_GITHUB.bat
+PROMOTE_TO_STABLE.bat
+promote_stable.py
 scripts/
 ui/js/modules/
