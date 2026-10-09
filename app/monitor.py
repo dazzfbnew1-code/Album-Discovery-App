@@ -72,7 +72,8 @@ def get_system_stats() -> dict:
         active = dl_status.get("active")
         queue_len = len(dl_status.get("queue", []))
         if active:
-            active_threads = active.get("active_threads", {})
+            raw_threads = active.get("active_threads") or {}
+            active_threads = {str(k): dict(v) for k, v in raw_threads.items() if isinstance(v, dict)} if isinstance(raw_threads, dict) else {}
             active_dl_info = {
                 "title": active.get("title", ""),
                 "artist": active.get("artist", ""),
@@ -83,8 +84,19 @@ def get_system_stats() -> dict:
                 "active_streams_count": len(active_threads),
                 "active_threads": active_threads
             }
-    except Exception:
-        pass
+        elif encoder_count > 0:
+            active_dl_info = {
+                "title": "Audio Stream Extraction",
+                "artist": "FFmpeg Engine",
+                "completed_tracks": 0,
+                "total_tracks": encoder_count,
+                "progress_pct": 50,
+                "current_track_title": f"{encoder_count} active audio transcoders",
+                "active_streams_count": encoder_count,
+                "active_threads": {}
+            }
+    except Exception as e:
+        log_info(f"[MONITOR] Downloader status parse note: {e}")
 
     # Subsystems: Library
     owned_count = 0

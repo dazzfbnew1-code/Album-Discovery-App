@@ -4132,10 +4132,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Subsystem 1: Downloader State
     const dl = data.downloader || {};
+    const isDlActive = Boolean((dl.is_active && dl.active_job) || encoderCount > 0);
     if (monDlStatusBadge && monDlBody) {
-      if (dl.is_active && dl.active_job) {
-        const job = dl.active_job;
-        monDlStatusBadge.innerHTML = `<span class="mon-pill-dot"></span>Downloading`;
+      if (isDlActive) {
+        const job = dl.active_job || {
+          artist: "FFmpeg Engine",
+          title: "Audio Stream Extraction",
+          completed_tracks: 0,
+          total_tracks: encoderCount,
+          progress_pct: 50,
+          active_streams_count: encoderCount,
+          active_threads: {}
+        };
+        const statusLabel = job.artist === "FFmpeg Engine" || (encoderCount > 0 && !dl.active_job) ? "Transcoding" : "Downloading";
+        monDlStatusBadge.innerHTML = `<span class="mon-pill-dot"></span>${statusLabel}`;
         monDlStatusBadge.className = "mon-status-pill downloading";
 
         const streamsCount = job.active_streams_count || Object.keys(job.active_threads || {}).length;

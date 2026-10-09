@@ -515,14 +515,6 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
             self._send_json({"status": "saved", "config": saved})
 
         elif route == "library/rescan":
-            try:
-                import importlib
-                import app.catalog, app.library, app.downloader
-                importlib.reload(app.catalog)
-                importlib.reload(app.library)
-                importlib.reload(app.downloader)
-            except Exception as reload_err:
-                log_error(f"Module reload failed: {reload_err}")
             self._send_json(scan_local_library())
 
         elif route == "monitor/trim-memory":

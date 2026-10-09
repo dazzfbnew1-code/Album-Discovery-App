@@ -125,12 +125,25 @@ def auto_update_ytdlp_background():
 
 
 class DownloadManager:
+    _instance = None
+    _singleton_lock = threading.Lock()
+
+    def __new__(cls, *args, **kwargs):
+        with cls._singleton_lock:
+            if cls._instance is None:
+                cls._instance = super(DownloadManager, cls).__new__(cls)
+                cls._instance._initialized = False
+            return cls._instance
+
     def __init__(self):
+        if getattr(self, "_initialized", False):
+            return
+        self._initialized = True
         self.queue = load_persisted_queue()
         self.active_job = None
         self.history = []
-        self._lock = threading.Lock()
-        self._worker_thread = threading.Thread(target=self._process_queue, daemon=True)
+        self._lock = threading.RLock()
+        self._worker_thread = threading.Thread(target=self._process_queue, daemon=True, name="DownloadManagerWorker")
         self._running = True
         self._worker_thread.start()
         auto_update_ytdlp_background()
@@ -235,10 +248,33 @@ class DownloadManager:
 
     def get_status(self) -> dict:
         with self._lock:
+            active_copy = None
+            if self.active_job:
+                try:
+                    active_copy = dict(self.active_job)
+                    raw_threads = self.active_job.get("active_threads") or {}
+                    if isinstance(raw_threads, dict):
+                        active_copy["active_threads"] = {
+                            str(k): dict(v) for k, v in raw_threads.items() if isinstance(v, dict)
+                        }
+                    else:
+                        active_copy["active_threads"] = {}
+                except Exception:
+                    active_copy = {
+                        "id": str(self.active_job.get("id", "")),
+                        "title": self.active_job.get("title", ""),
+                        "artist": self.active_job.get("artist", ""),
+                        "completed_tracks": self.active_job.get("completed_tracks", 0),
+                        "total_tracks": self.active_job.get("total_tracks", 0),
+                        "progress_pct": self.active_job.get("progress_pct", 0),
+                        "current_track_title": self.active_job.get("current_track_title", ""),
+                        "status": self.active_job.get("status", "downloading"),
+                        "active_threads": {}
+                    }
             return {
-                "active": self.active_job,
-                "queue": list(self.queue),
-                "history": list(self.history)[-15:]
+                "active": active_copy,
+                "queue": [dict(j) for j in self.queue],
+                "history": [dict(j) for j in self.history[-15:]]
             }
 
     def _process_queue(self):
@@ -367,9 +403,9 @@ class DownloadManager:
                 log_download(f"  [TRACK {idx}/{total} EXISTS] '{tr_title}' already downloaded, skipping.")
                 return
 
-            if "active_threads" not in job:
-                job["active_threads"] = {}
-            with progress_lock:
+            with self._lock:
+                if "active_threads" not in job or not isinstance(job["active_threads"], dict):
+                    job["active_threads"] = {}
                 job["active_threads"][str(idx)] = {
                     "idx": idx,
                     "title": tr_title,
@@ -428,8 +464,8 @@ class DownloadManager:
                     job["completed_tracks"] = completed_count
                     job["progress_pct"] = int((completed_count / total) * 100) if total else 100
             finally:
-                with progress_lock:
-                    if "active_threads" in job:
+                with self._lock:
+                    if "active_threads" in job and isinstance(job["active_threads"], dict):
                         job["active_threads"].pop(str(idx), None)
 
         concurrency = max(1, min(10, int(CONFIG.get("download_concurrency", 3))))
@@ -484,26 +520,28 @@ class DownloadManager:
                 if eta:
                     eta_str = f"{eta}s"
 
-                job["current_track_pct"] = pct
-                job["current_track_speed"] = speed_str
-                job["current_track_eta"] = eta_str
-                job["current_track_idx"] = track_idx
-                job["current_track_title"] = tr_title
+                with self._lock:
+                    job["current_track_pct"] = pct
+                    job["current_track_speed"] = speed_str
+                    job["current_track_eta"] = eta_str
+                    job["current_track_idx"] = track_idx
+                    job["current_track_title"] = tr_title
 
-                if "active_threads" not in job:
-                    job["active_threads"] = {}
-                job["active_threads"][str(track_idx)] = {
-                    "idx": track_idx,
-                    "title": tr_title,
-                    "pct": pct,
-                    "speed": speed_str,
-                    "eta": eta_str
-                }
+                    if "active_threads" not in job or not isinstance(job["active_threads"], dict):
+                        job["active_threads"] = {}
+                    job["active_threads"][str(track_idx)] = {
+                        "idx": track_idx,
+                        "title": tr_title,
+                        "pct": pct,
+                        "speed": speed_str,
+                        "eta": eta_str
+                    }
             elif d.get("status") == "finished":
-                job["current_track_pct"] = 99
-                if "active_threads" in job and str(track_idx) in job["active_threads"]:
-                    job["active_threads"][str(track_idx)]["pct"] = 99
-                    job["active_threads"][str(track_idx)]["speed"] = "Processing tags..."
+                with self._lock:
+                    job["current_track_pct"] = 99
+                    if "active_threads" in job and isinstance(job["active_threads"], dict) and str(track_idx) in job["active_threads"]:
+                        job["active_threads"][str(track_idx)]["pct"] = 99
+                        job["active_threads"][str(track_idx)]["speed"] = "Processing tags..."
         return hook
 
     @staticmethod
