@@ -76,10 +76,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const stopBtn = document.getElementById("stopBtn");
   const prevTrackBtn = document.getElementById("prevTrackBtn");
   const nextTrackBtn = document.getElementById("nextTrackBtn");
+  const hudShuffleBtn = document.getElementById("hudShuffleBtn");
+  const hudRepeatBtn = document.getElementById("hudRepeatBtn");
+  const repeatOneBadge = document.getElementById("repeatOneBadge");
+  const hudQualityPill = document.getElementById("hudQualityPill");
+  const volMuteBtn = document.getElementById("volMuteBtn");
+  const volIconHigh = document.getElementById("volIconHigh");
+  const volIconMuted = document.getElementById("volIconMuted");
   const playerVolumeSlider = document.getElementById("playerVolumeSlider");
   const playerVolumeLabel = document.getElementById("playerVolumeLabel");
   const hudLyricsBtn = document.getElementById("hudLyricsBtn");
   const hudDismissBtn = document.getElementById("hudDismissBtn");
+
+  let isShuffle = localStorage.getItem("discovery_player_shuffle") === "true";
+  let repeatMode = localStorage.getItem("discovery_player_repeat") || "off"; // "off" | "all" | "one"
+  let previousVolume = masterVolume || 1.0;
+  let isMuted = false;
   const deckA = document.getElementById("globalAudioPlayer");
   const deckB = document.getElementById("standbyAudioPlayer") || (function() {
     const el = document.createElement("audio");
@@ -572,16 +584,33 @@ document.addEventListener("DOMContentLoaded", () => {
       openLyricsForCurrentTrack();
     }
 
-    // Update Player Badge
+    // Update Player Badge and Hi-Fi Audio Quality Pill
     if (isLibraryRadioMode) {
       playerBadge.textContent = `📻 Library DJ Radio (${index + 1}/${currentTracklist.length})`;
       hudAlbumTitle.textContent = "📻 LIBRARY RADIO (LIVE DJ MIX)";
+      if (hudQualityPill) {
+        hudQualityPill.textContent = "DJ RADIO MIX";
+        hudQualityPill.className = "hud-quality-pill radio";
+      }
     } else if (track.local_path || track.is_local) {
       playerBadge.textContent = `💾 Local Master (${index + 1}/${currentTracklist.length})`;
+      if (hudQualityPill) {
+        const isFlac = (track.local_path || "").toLowerCase().endsWith(".flac");
+        hudQualityPill.textContent = isFlac ? "FLAC LOSSLESS" : "320K MASTER";
+        hudQualityPill.className = "hud-quality-pill master";
+      }
     } else if (isFullAlbumMode) {
       playerBadge.textContent = `💿 Full Studio (${index + 1}/${currentTracklist.length})`;
+      if (hudQualityPill) {
+        hudQualityPill.textContent = "STUDIO MASTER";
+        hudQualityPill.className = "hud-quality-pill";
+      }
     } else {
       playerBadge.textContent = `⚡ 30s Audition (${index + 1}/${currentTracklist.length})`;
+      if (hudQualityPill) {
+        hudQualityPill.textContent = "30S PREVIEW";
+        hudQualityPill.className = "hud-quality-pill";
+      }
     }
   }
 
@@ -811,13 +840,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function playNextTrack() {
+  function playNextTrack(isAutoAdvancement = false) {
     if (isLibraryRadioMode && currentTrackIndex >= currentTracklist.length - 3 && !isFetchingMoreRadioTracks) {
       fetchMoreRadioTracks();
     }
+    if (!currentTracklist || currentTracklist.length === 0) return;
+
+    // Repeat One Mode (triggers on natural song completion)
+    if (isAutoAdvancement && repeatMode === "one" && currentTrackIndex >= 0) {
+      playTrackAtIndex(currentTrackIndex, isFullAlbumMode);
+      return;
+    }
+
+    // Shuffle Mode: Pick a randomized next track
+    if (isShuffle && currentTracklist.length > 1) {
+      let nextIdx = Math.floor(Math.random() * currentTracklist.length);
+      let attempts = 0;
+      while (nextIdx === currentTrackIndex && attempts < 10) {
+        nextIdx = Math.floor(Math.random() * currentTracklist.length);
+        attempts++;
+      }
+      playTrackAtIndex(nextIdx, isFullAlbumMode);
+      return;
+    }
+
+    // Sequential Next Track
     if (currentTrackIndex + 1 < currentTracklist.length) {
       playTrackAtIndex(currentTrackIndex + 1, isFullAlbumMode);
-    } else if (currentTracklist.length > 0 && (isFullAlbumMode || isLibraryRadioMode)) {
+    } else if (repeatMode === "all" || isFullAlbumMode || isLibraryRadioMode) {
       playTrackAtIndex(0, true);
     }
   }
@@ -913,7 +963,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (isCrossfading) return;
     if (isFullAlbumMode || isLibraryRadioMode || configData.auto_advance_preview !== false) {
-      playNextTrack();
+      playNextTrack(true);
     } else {
       pauseTrack();
     }
@@ -942,10 +992,62 @@ document.addEventListener("DOMContentLoaded", () => {
     activeDeck.currentTime = pos * activeDeck.duration;
   });
 
+  function toggleMute() {
+    if (!isMuted) {
+      previousVolume = masterVolume > 0 ? masterVolume : (parseFloat(playerVolumeSlider ? playerVolumeSlider.value : 1) || 1.0);
+      isMuted = true;
+      masterVolume = 0;
+      activeDeck.volume = 0;
+      if (standbyDeck) standbyDeck.volume = 0;
+      if (playerVolumeSlider) playerVolumeSlider.value = 0;
+      if (playerVolumeLabel) playerVolumeLabel.textContent = "0%";
+      if (volIconHigh) volIconHigh.classList.add("hidden");
+      if (volIconMuted) volIconMuted.classList.remove("hidden");
+      if (volMuteBtn) {
+        volMuteBtn.classList.add("muted");
+        volMuteBtn.title = "Unmute Audio (Restores Prior Volume)";
+      }
+    } else {
+      isMuted = false;
+      masterVolume = previousVolume > 0 ? previousVolume : 1.0;
+      activeDeck.volume = masterVolume;
+      if (standbyDeck) standbyDeck.volume = masterVolume;
+      if (playerVolumeSlider) playerVolumeSlider.value = masterVolume;
+      if (playerVolumeLabel) playerVolumeLabel.textContent = `${Math.round(masterVolume * 100)}%`;
+      if (volIconHigh) volIconHigh.classList.remove("hidden");
+      if (volIconMuted) volIconMuted.classList.add("hidden");
+      if (volMuteBtn) {
+        volMuteBtn.classList.remove("muted");
+        volMuteBtn.title = "Mute Audio";
+      }
+    }
+  }
+
+  if (volMuteBtn) {
+    volMuteBtn.addEventListener("click", toggleMute);
+  }
+
   if (playerVolumeSlider) {
     playerVolumeSlider.addEventListener("input", (e) => {
       const val = parseFloat(e.target.value);
       masterVolume = val;
+      if (val > 0 && isMuted) {
+        isMuted = false;
+        if (volIconHigh) volIconHigh.classList.remove("hidden");
+        if (volIconMuted) volIconMuted.classList.add("hidden");
+        if (volMuteBtn) {
+          volMuteBtn.classList.remove("muted");
+          volMuteBtn.title = "Mute Audio";
+        }
+      } else if (val === 0 && !isMuted) {
+        isMuted = true;
+        if (volIconHigh) volIconHigh.classList.add("hidden");
+        if (volIconMuted) volIconMuted.classList.remove("hidden");
+        if (volMuteBtn) {
+          volMuteBtn.classList.add("muted");
+          volMuteBtn.title = "Unmute Audio";
+        }
+      }
       if (!isCrossfading) {
         activeDeck.volume = val;
       }
@@ -954,11 +1056,71 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Shuffle & Repeat Controls
+  if (hudShuffleBtn) {
+    hudShuffleBtn.classList.toggle("active", isShuffle);
+    hudShuffleBtn.title = isShuffle ? "Shuffle: Enabled (Click to Disable)" : "Shuffle: Disabled (Click to Enable)";
+    hudShuffleBtn.addEventListener("click", () => {
+      isShuffle = !isShuffle;
+      hudShuffleBtn.classList.toggle("active", isShuffle);
+      hudShuffleBtn.title = isShuffle ? "Shuffle: Enabled (Click to Disable)" : "Shuffle: Disabled (Click to Enable)";
+      localStorage.setItem("discovery_player_shuffle", isShuffle);
+      showToast(isShuffle ? "🔀 Shuffle Mode Enabled" : "➡️ Shuffle Mode Disabled", "info");
+    });
+  }
+
+  function syncRepeatUi() {
+    if (!hudRepeatBtn) return;
+    if (repeatMode === "one") {
+      hudRepeatBtn.classList.add("active");
+      if (repeatOneBadge) repeatOneBadge.classList.remove("hidden");
+      hudRepeatBtn.title = "Repeat: Current Track (Click to Turn Off)";
+    } else if (repeatMode === "all") {
+      hudRepeatBtn.classList.add("active");
+      if (repeatOneBadge) repeatOneBadge.classList.add("hidden");
+      hudRepeatBtn.title = "Repeat: All Tracks (Click for Repeat One)";
+    } else {
+      hudRepeatBtn.classList.remove("active");
+      if (repeatOneBadge) repeatOneBadge.classList.add("hidden");
+      hudRepeatBtn.title = "Repeat: Off (Click for Repeat All)";
+    }
+  }
+  syncRepeatUi();
+
+  if (hudRepeatBtn) {
+    hudRepeatBtn.addEventListener("click", () => {
+      if (repeatMode === "off") {
+        repeatMode = "all";
+        showToast("🔁 Repeat: All Tracks", "info");
+      } else if (repeatMode === "all") {
+        repeatMode = "one";
+        showToast("🔂 Repeat: Current Track", "info");
+      } else {
+        repeatMode = "off";
+        showToast("➡️ Repeat: Off", "info");
+      }
+      localStorage.setItem("discovery_player_repeat", repeatMode);
+      syncRepeatUi();
+    });
+  }
+
   playPauseBtn.addEventListener("click", togglePlayPause);
   stopBtn.addEventListener("click", stopPlayerHud);
   hudDismissBtn.addEventListener("click", minimizePlayerHud);
-  nextTrackBtn.addEventListener("click", playNextTrack);
+  nextTrackBtn.addEventListener("click", () => playNextTrack(false));
   prevTrackBtn.addEventListener("click", playPrevTrack);
+
+  // 🛡️ Universal Defensive Modal Observer (Guarantees zero player overlap whenever ANY modal is opened)
+  const appModalBackdrops = document.querySelectorAll(".modal-backdrop");
+  function syncBodyModalState() {
+    const isAnyModalActive = Array.from(appModalBackdrops).some(m => !m.classList.contains("hidden"));
+    document.body.classList.toggle("modal-open", isAnyModalActive);
+  }
+  const bodyModalObserver = new MutationObserver(syncBodyModalState);
+  appModalBackdrops.forEach(m => {
+    bodyModalObserver.observe(m, { attributes: true, attributeFilter: ["class"] });
+  });
+  syncBodyModalState();
 
   function openLyricsForCurrentTrack() {
     albumModal.classList.remove("hidden");
