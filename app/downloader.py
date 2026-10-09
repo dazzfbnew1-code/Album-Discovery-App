@@ -418,7 +418,8 @@ class DownloadManager:
 
             log_download(f"  [TRACK {idx}/{total} START] '{tr_artist} - {tr_title}' - downloading...")
             try:
-                self._download_audio_track_with_retry(tr_artist, tr_title, str(out_file), spec, job, idx)
+                tr_dur = int(tr.get("duration") or 0)
+                self._download_audio_track_with_retry(tr_artist, tr_title, str(out_file), spec, job, idx, expected_duration=tr_dur)
 
                 embed_art = CONFIG.get("embed_cover_art", True)
                 cov_to_embed = str(cover_path) if (embed_art and cover_path.exists()) else ""
@@ -623,7 +624,7 @@ class DownloadManager:
 
         return primary_art, t_clean, core_tit, deduped
 
-    def _download_audio_track_with_retry(self, artist: str, title: str, out_path: str, spec: dict, job: dict, track_idx: int = 1):
+    def _download_audio_track_with_retry(self, artist: str, title: str, out_path: str, spec: dict, job: dict, track_idx: int = 1, expected_duration: int = 0):
         if not HAS_YTDLP or not yt_dlp:
             time.sleep(1)
             return
@@ -799,17 +800,36 @@ class DownloadManager:
                 log_download(f"    [TIER 2 NOTICE] Candidate '{cid}' could not be downloaded via cookie stream: {last_candidate_err}")
             return False, last_candidate_err
 
+        def is_candidate_valid_duration(entry) -> bool:
+            if not entry or not isinstance(entry, dict):
+                return False
+            c_dur = entry.get("duration") or 0
+            if not c_dur:
+                return True
+            if expected_duration > 15:
+                max_allowed = max(expected_duration + 120, int(expected_duration * 1.6))
+                min_allowed = max(15, int(expected_duration * 0.4))
+                if c_dur > max_allowed or c_dur < min_allowed:
+                    return False
+            elif c_dur > 900:
+                return False
+            return True
+
         candidate_ids = []
         try:
             with yt_dlp.YoutubeDL(search_opts) as search_ydl:
-                for sq in search_queries[:2]:
+                for sq in search_queries[:3]:
                     try:
                         res = search_ydl.extract_info(sq, download=False)
                         if res and "entries" in res:
                             for entry in res["entries"]:
-                                if entry and entry.get("id") and entry["id"] not in candidate_ids:
+                                if not entry or not entry.get("id"):
+                                    continue
+                                if not is_candidate_valid_duration(entry):
+                                    continue
+                                if entry["id"] not in candidate_ids:
                                     candidate_ids.append(entry["id"])
-                        if len(candidate_ids) >= 2:
+                        if len(candidate_ids) >= 3:
                             break
                     except Exception:
                         continue
@@ -823,6 +843,20 @@ class DownloadManager:
         for cid in candidate_ids:
             success, err = _attempt_candidate_download(cid)
             if success and safe_out.exists() and safe_out.stat().st_size > 50000:
+                if expected_duration > 15:
+                    try:
+                        import mutagen
+                        m_chk = mutagen.File(str(safe_out))
+                        if m_chk and m_chk.info and m_chk.info.length:
+                            actual_dur = int(m_chk.info.length)
+                            max_dur = max(expected_duration + 120, int(expected_duration * 1.6))
+                            if actual_dur > max_dur:
+                                log_warn(f"    [DURATION GUARD] Downloaded candidate '{cid}' length ({actual_dur}s) vastly exceeds expected ({expected_duration}s). Rejecting...")
+                                _cleanup_partial_artifacts()
+                                safe_out.unlink(missing_ok=True)
+                                continue
+                    except Exception:
+                        pass
                 return
             last_err = err
             log_download(f"    [RETRY] Candidate '{cid}' failed. Trying next candidate...")
@@ -847,10 +881,14 @@ class DownloadManager:
                             res = search_ydl.extract_info(fq, download=False)
                             if res and "entries" in res:
                                 for entry in res["entries"]:
-                                    if entry and entry.get("id") and entry["id"] not in fallback_candidate_ids:
+                                    if not entry or not entry.get("id"):
+                                        continue
+                                    if not is_candidate_valid_duration(entry):
+                                        continue
+                                    if entry["id"] not in fallback_candidate_ids:
                                         fallback_candidate_ids.append(entry["id"])
-                            if len(fallback_candidate_ids) >= 2:
-                                break
+                                if len(fallback_candidate_ids) >= 3:
+                                    break
                         except Exception:
                             continue
             except Exception:
@@ -862,6 +900,20 @@ class DownloadManager:
             for cid in fallback_candidate_ids:
                 success, err = _attempt_candidate_download(cid)
                 if success and safe_out.exists() and safe_out.stat().st_size > 50000:
+                    if expected_duration > 15:
+                        try:
+                            import mutagen
+                            m_chk = mutagen.File(str(safe_out))
+                            if m_chk and m_chk.info and m_chk.info.length:
+                                actual_dur = int(m_chk.info.length)
+                                max_dur = max(expected_duration + 120, int(expected_duration * 1.6))
+                                if actual_dur > max_dur:
+                                    log_warn(f"    [DURATION GUARD] Fallback candidate '{cid}' length ({actual_dur}s) vastly exceeds expected ({expected_duration}s). Rejecting...")
+                                    _cleanup_partial_artifacts()
+                                    safe_out.unlink(missing_ok=True)
+                                    continue
+                        except Exception:
+                            pass
                     log_download(f"  [FALLBACK SUCCESS [OK]] Successfully recovered and downloaded '{title}' using fallback '{primary_art} - {core_title}'")
                     return
                 last_err = err
