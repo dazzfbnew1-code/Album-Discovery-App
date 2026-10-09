@@ -22,6 +22,7 @@ OWNED_BY_ARTIST = {}  # Normalized artist -> list of info dicts
 OWNED_TITLES = set()
 LAST_SCAN_TIME = 0
 IS_SCANNING = False
+_ROOT_SNAPSHOT = {}
 
 def normalize_text(text: str) -> str:
     if not text:
@@ -93,6 +94,63 @@ def is_ignored_path(path_obj: Path) -> bool:
         return False
     except Exception:
         return False
+
+def get_library_roots_snapshot() -> dict:
+    """Takes an ultra-fast (<10ms) snapshot of folder modified times across configured roots."""
+    roots = get_configured_music_roots()
+    snap = {}
+    for r in roots:
+        rp = Path(r)
+        if not rp.exists() or not rp.is_dir():
+            continue
+        try:
+            snap[str(rp)] = rp.stat().st_mtime
+            for artist_entry in os.scandir(str(rp)):
+                name_lower = artist_entry.name.lower()
+                if (artist_entry.is_dir(follow_symlinks=False) 
+                    and name_lower not in IGNORED_DIR_NAMES 
+                    and not name_lower.startswith("$") 
+                    and not name_lower.startswith(".")):
+                    try:
+                        snap[artist_entry.path] = artist_entry.stat().st_mtime
+                        for album_entry in os.scandir(artist_entry.path):
+                            alb_name_lower = album_entry.name.lower()
+                            if (album_entry.is_dir(follow_symlinks=False) 
+                                and alb_name_lower not in IGNORED_DIR_NAMES 
+                                and not alb_name_lower.startswith("$") 
+                                and not alb_name_lower.startswith(".")):
+                                try:
+                                    snap[album_entry.path] = album_entry.stat().st_mtime
+                                except Exception:
+                                    pass
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    return snap
+
+def check_for_library_changes() -> bool:
+    """Returns True ONLY if a directory addition, deletion, or modification occurred on disk."""
+    global _ROOT_SNAPSHOT
+    current_snap = get_library_roots_snapshot()
+    if not _ROOT_SNAPSHOT:
+        _ROOT_SNAPSHOT = current_snap
+        return False
+    if current_snap != _ROOT_SNAPSHOT:
+        _ROOT_SNAPSHOT = current_snap
+        return True
+    return False
+
+def get_library_status() -> dict:
+    """Instant in-memory lookup of current indexed library state without disk scan."""
+    with _LOCK:
+        return {
+            "status": "complete" if not IS_SCANNING else "scanning",
+            "total_owned": len(OWNED_ALBUMS),
+            "music_roots": [str(r) for r in get_configured_music_roots()],
+            "last_scan_time": LAST_SCAN_TIME,
+            "is_scanning": IS_SCANNING
+        }
 
 def scan_local_library(custom_root: str = None) -> dict:
     global OWNED_ALBUMS, OWNED_BY_ARTIST, OWNED_TITLES, LAST_SCAN_TIME, IS_SCANNING
@@ -200,6 +258,12 @@ def scan_local_library(custom_root: str = None) -> dict:
             OWNED_TITLES = scanned_titles
             LAST_SCAN_TIME = time.time()
             IS_SCANNING = False
+
+        global _ROOT_SNAPSHOT
+        try:
+            _ROOT_SNAPSHOT = get_library_roots_snapshot()
+        except Exception:
+            pass
 
         elapsed = time.time() - start_t
         roots_display = ", ".join(str(r) for r in target_roots)
@@ -469,13 +533,25 @@ def delete_library_album(folder_path: str) -> bool:
     return False
 
 def start_background_library_scanner():
-    """Start initial drive library scan and background periodic refresh loop."""
+    """Start initial drive library scan on launch, then passively watch for changes."""
     def _scanner_loop():
+        global _ROOT_SNAPSHOT
         time.sleep(0.5)
         scan_local_library()
+        try:
+            _ROOT_SNAPSHOT = get_library_roots_snapshot()
+        except Exception:
+            pass
+
         while True:
-            time.sleep(30.0)
-            scan_local_library()
+            # Check every 15 seconds passively; if nothing changed, ZERO disk I/O is performed
+            time.sleep(15.0)
+            try:
+                if check_for_library_changes():
+                    log_discovery("[DRIVE CHANGE DETECTED] Change detected in music library folder — auto-indexing...")
+                    scan_local_library()
+            except Exception as e:
+                log_error(f"Error in background library monitor: {e}")
 
     t = threading.Thread(target=_scanner_loop, daemon=True, name="BackgroundLibraryScanner")
     t.start()

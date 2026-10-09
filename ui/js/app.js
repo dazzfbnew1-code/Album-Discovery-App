@@ -3587,7 +3587,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btnRescanLibraryNow.disabled = true;
       btnRescanLibraryNow.innerHTML = "<span>⏳ Scanning Disk...</span>";
       try {
-        const res = await fetch("/api/library/status");
+        const res = await fetch("/api/library/rescan", { method: "POST" });
         const data = await res.json();
         const total = data.total_owned || (data.albums ? data.albums.length : 0);
         showToast(`✓ Library Re-Indexed: ${total} albums ready`, "success");
@@ -4264,7 +4264,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnMonRescanLibrary.disabled = true;
     btnMonRescanLibrary.innerHTML = `${svgSpinner} <span>Scanning...</span>`;
     try {
-      const res = await fetch("/api/library/status");
+      const res = await fetch("/api/library/rescan", { method: "POST" });
       const data = await res.json();
       const total = data.total_owned || (data.albums ? data.albums.length : 0);
       showToast(`✓ Library scanned: ${total} albums ready`, "success");

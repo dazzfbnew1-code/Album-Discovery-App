@@ -22,6 +22,7 @@ from .flow import get_album_flow
 from .downloader import DOWNLOAD_MANAGER
 from .library import (
     scan_local_library, 
+    get_library_status,
     start_background_library_scanner, 
     is_album_owned, 
     backfill_missing_covers,
@@ -247,7 +248,7 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
             self._send_json(CONFIG)
 
         elif route == "library/status":
-            self._send_json(scan_local_library())
+            self._send_json(get_library_status())
 
         elif route == "library/drives":
             roots = get_configured_music_roots()
