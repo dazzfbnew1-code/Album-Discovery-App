@@ -34,7 +34,30 @@ def find_free_port(start_port=8779):
     return 8779
 
 
+APP_WINDOW_TITLE = "Album Discovery App - Music & Discography Hub"
+
+
+def focus_existing_instance(window_title: str) -> bool:
+    """If an existing instance of the desktop window is already running, brings it to focus and returns True."""
+    if os.name != "nt":
+        return False
+    try:
+        user32 = ctypes.windll.user32
+        hwnd = user32.FindWindowW(None, window_title)
+        if hwnd:
+            # SW_RESTORE = 9
+            user32.ShowWindow(hwnd, 9)
+            user32.SetForegroundWindow(hwnd)
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def main():
+    if focus_existing_instance(APP_WINDOW_TITLE):
+        sys.exit(0)
+
     try:
         from app.downloader import auto_update_ytdlp_background
         auto_update_ytdlp_background()
@@ -86,7 +109,7 @@ def main():
             pass
 
     if webview:
-        win_title = "Album Discovery App - Music & Discography Hub"
+        win_title = APP_WINDOW_TITLE
         window = webview.create_window(
             title=win_title,
             url=app_url,
