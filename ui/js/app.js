@@ -160,8 +160,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const monDlBody = document.getElementById("monDlBody");
   const monLibCount = document.getElementById("monLibCount");
   const monLibPath = document.getElementById("monLibPath");
-  const monDbName = document.getElementById("monDbName");
-  const monDbSize = document.getElementById("monDbSize");
   const monDbDiscoverySize = document.getElementById("monDbDiscoverySize");
   const monDbLibrarySize = document.getElementById("monDbLibrarySize");
   const monDbLyricsSize = document.getElementById("monDbLyricsSize");
@@ -4190,8 +4188,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Subsystem 3: Database State
     const db = data.database || {};
-    if (monDbName) monDbName.textContent = db.name || "discovery.db";
-    if (monDbSize) monDbSize.textContent = db.size_str || `${db.size_kb || 0} KB`;
     if (monDbDiscoverySize) monDbDiscoverySize.textContent = db.app_size || "0 KB";
     if (monDbLibrarySize) monDbLibrarySize.textContent = db.library_size || "0 KB";
     if (monDbLyricsSize) monDbLyricsSize.textContent = db.lyrics_size || "0 KB";

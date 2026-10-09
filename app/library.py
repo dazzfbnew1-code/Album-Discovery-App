@@ -45,9 +45,19 @@ def make_album_key(artist: str, album: str) -> str:
     norm_alb = normalize_text(album)
     return f"{norm_art}:::{norm_alb}"
 
+_LOCAL_COVER_CACHE = {}
+
 def resolve_local_album_cover(folder_path: Path) -> str:
-    """Finds or extracts front cover image from local album folder or audio tags."""
+    """Finds or extracts front cover image from local album folder or audio tags with instant caching."""
+    f_str = str(folder_path)
+    if f_str in _LOCAL_COVER_CACHE:
+        cached = _LOCAL_COVER_CACHE[f_str]
+        if cached:
+            return cached
+        # If cached was empty, allow quick retry only if directory exists
+    
     if not folder_path.exists() or not folder_path.is_dir():
+        _LOCAL_COVER_CACHE[f_str] = ""
         return ""
     
     # 1. Look for existing cover.jpg, folder.jpg, front.jpg, cover.png, etc.
@@ -55,12 +65,16 @@ def resolve_local_album_cover(folder_path: Path) -> str:
     for name in preferred_names:
         candidate = folder_path / name
         if candidate.exists() and candidate.is_file() and candidate.stat().st_size > 500:
-            return str(candidate)
+            res_str = str(candidate)
+            _LOCAL_COVER_CACHE[f_str] = res_str
+            return res_str
             
     # 2. Check any other image in the folder
     for f in folder_path.iterdir():
         if f.is_file() and f.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"} and f.stat().st_size > 500:
-            return str(f)
+            res_str = str(f)
+            _LOCAL_COVER_CACHE[f_str] = res_str
+            return res_str
             
     # 3. Try to extract embedded ID3 APIC / FLAC Picture from the first audio track
     audio_files = [f for f in folder_path.iterdir() if f.is_file() and f.suffix.lower() in AUDIO_EXTS]
@@ -78,17 +92,22 @@ def resolve_local_album_cover(folder_path: Path) -> str:
                             if hasattr(apic, "data") and apic.data:
                                 target_cov = folder_path / "cover.jpg"
                                 target_cov.write_bytes(apic.data)
-                                return str(target_cov)
+                                res_str = str(target_cov)
+                                _LOCAL_COVER_CACHE[f_str] = res_str
+                                return res_str
                 # FLAC Picture tag
                 if hasattr(mf, "pictures") and mf.pictures:
                     pic = mf.pictures[0]
                     if hasattr(pic, "data") and pic.data:
                         target_cov = folder_path / "cover.jpg"
                         target_cov.write_bytes(pic.data)
-                        return str(target_cov)
+                        res_str = str(target_cov)
+                        _LOCAL_COVER_CACHE[f_str] = res_str
+                        return res_str
         except Exception:
             pass
 
+    _LOCAL_COVER_CACHE[f_str] = ""
     return ""
 
 def is_ignored_path(path_obj: Path) -> bool:
