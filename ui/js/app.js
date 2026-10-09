@@ -90,7 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let isShuffle = localStorage.getItem("discovery_player_shuffle") === "true";
   let repeatMode = localStorage.getItem("discovery_player_repeat") || "off"; // "off" | "all" | "one"
-  let previousVolume = masterVolume || 1.0;
+  let previousVolume = 1.0;
   let isMuted = false;
   const deckA = document.getElementById("globalAudioPlayer");
   const deckB = document.getElementById("standbyAudioPlayer") || (function() {
@@ -347,6 +347,7 @@ document.addEventListener("DOMContentLoaded", () => {
   deckB.volume = masterVolume;
   if (playerVolumeSlider) playerVolumeSlider.value = masterVolume;
   if (playerVolumeLabel) playerVolumeLabel.textContent = `${Math.round(masterVolume * 100)}%`;
+  previousVolume = masterVolume;
 
   let isCrossfading = false;
   let crossfadeInterval = null;
@@ -595,8 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (track.local_path || track.is_local) {
       playerBadge.textContent = `💾 Local Master (${index + 1}/${currentTracklist.length})`;
       if (hudQualityPill) {
-        const isFlac = (track.local_path || "").toLowerCase().endsWith(".flac");
-        hudQualityPill.textContent = isFlac ? "FLAC LOSSLESS" : "320K MASTER";
+        hudQualityPill.textContent = "320K MASTER";
         hudQualityPill.className = "hud-quality-pill master";
       }
     } else if (isFullAlbumMode) {
@@ -1276,9 +1276,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      const rawLimit = (configData && configData.discovery_album_limit !== undefined)
+      const parsedLimit = Number(configData && configData.discovery_album_limit !== undefined
         ? configData.discovery_album_limit
-        : (settingDiscoveryLimit ? parseInt(settingDiscoveryLimit.value, 10) : 0);
+        : (settingDiscoveryLimit ? settingDiscoveryLimit.value : 0));
+      const rawLimit = isNaN(parsedLimit) ? 0 : parsedLimit;
       // With pagination enabled, default 0 loads all available albums for multi-page browsing
       const discLimit = (rawLimit === 100) ? 0 : rawLimit;
       const url = `/api/charts?genre=${encodeURIComponent(genre)}&limit=${discLimit}${forceRefresh ? '&refresh=1' : ''}`;
@@ -1341,9 +1342,10 @@ document.addEventListener("DOMContentLoaded", () => {
     viewSectionCount.textContent = "Rolling masterworks across genres...";
 
     try {
-      const discLimit = (configData && configData.discovery_album_limit !== undefined)
+      const parsedLimit = Number(configData && configData.discovery_album_limit !== undefined
         ? configData.discovery_album_limit
-        : (settingDiscoveryLimit ? parseInt(settingDiscoveryLimit.value, 10) : 60);
+        : (settingDiscoveryLimit ? settingDiscoveryLimit.value : 60));
+      const discLimit = isNaN(parsedLimit) ? 60 : parsedLimit;
       const res = await fetch(`/api/discovery/surprise?limit=${discLimit}`);
       const data = await res.json();
       const albums = (data && data.albums) || [];
