@@ -734,7 +734,7 @@ class DownloadManager:
                         pass
 
             if last_candidate_err:
-                log_warn(f"    [TIER 2] All fallback strategies exhausted for candidate '{cid}': {last_candidate_err}")
+                log_download(f"    [TIER 2 NOTICE] Candidate '{cid}' could not be downloaded via cookie stream: {last_candidate_err}")
             return False, last_candidate_err
 
         candidate_ids = []
@@ -763,7 +763,7 @@ class DownloadManager:
             if success and safe_out.exists() and safe_out.stat().st_size > 50000:
                 return
             last_err = err
-            log_warn(f"    [RETRY] Candidate '{cid}' failed. Trying next candidate...")
+            log_download(f"    [RETRY] Candidate '{cid}' failed. Trying next candidate...")
             _cleanup_partial_artifacts()
             time.sleep(0.2)
 
@@ -803,7 +803,7 @@ class DownloadManager:
                     log_download(f"  [FALLBACK SUCCESS ✓] Successfully recovered and downloaded '{title}' using fallback '{primary_art} - {core_title}'")
                     return
                 last_err = err
-                log_warn(f"    [FALLBACK CANDIDATE RETRY] Candidate '{cid}' failed. Trying next fallback candidate...")
+                log_download(f"    [FALLBACK CANDIDATE RETRY] Candidate '{cid}' failed. Trying next fallback candidate...")
                 _cleanup_partial_artifacts()
                 time.sleep(0.2)
 
