@@ -1234,6 +1234,40 @@ def get_artist_discography(artist_id: str):
         "gap_analysis": gap_analysis
     }
 
+def _bind_local_tracks_if_owned(tracks: list, owned_status: dict):
+    if not owned_status.get("owned") or not owned_status.get("path"):
+        return
+    try:
+        alb_dir = Path(owned_status["path"])
+        if not alb_dir.exists() or not alb_dir.is_dir():
+            return
+        from .library import AUDIO_EXTS
+        import urllib.parse
+        local_files = sorted([f for f in alb_dir.iterdir() if f.suffix.lower() in AUDIO_EXTS], key=lambda f: f.name)
+        if not local_files:
+            return
+        if len(local_files) == len(tracks):
+            for i, f in enumerate(local_files):
+                stream_url = f"/api/local-file?path={urllib.parse.quote(str(f))}"
+                tracks[i]["local_path"] = str(f)
+                tracks[i]["is_local"] = True
+                tracks[i]["preview"] = stream_url
+                tracks[i]["stream_url"] = stream_url
+        else:
+            for tr in tracks:
+                tr_clean = re.sub(r'[^a-zA-Z0-9]', '', tr.get("title", "").lower())
+                for f in local_files:
+                    f_clean = re.sub(r'[^a-zA-Z0-9]', '', f.stem.lower())
+                    if tr_clean and (tr_clean in f_clean or f_clean in tr_clean):
+                        stream_url = f"/api/local-file?path={urllib.parse.quote(str(f))}"
+                        tr["local_path"] = str(f)
+                        tr["is_local"] = True
+                        tr["preview"] = stream_url
+                        tr["stream_url"] = stream_url
+                        break
+    except Exception:
+        pass
+
 def get_album_details(album_id: str, force_refresh: bool = False):
     start_t = time.time()
     if not force_refresh:
@@ -1242,6 +1276,7 @@ def get_album_details(album_id: str, force_refresh: bool = False):
             owned_status = is_album_owned(cached.get("artist", ""), cached.get("title", ""))
             cached["owned"] = owned_status.get("owned", False)
             cached["owned_path"] = owned_status.get("path", "")
+            _bind_local_tracks_if_owned(cached["tracks"], owned_status)
             log_discovery(f"[CACHE HIT] Album details for '{cached.get('title')}' loaded in {time.time() - start_t:.3f}s")
             return cached
 
@@ -1317,6 +1352,8 @@ def get_album_details(album_id: str, force_refresh: bool = False):
         tr["cover_big"] = resolved_art
         tr["cover_small"] = cov_sm
         tr["year"] = accurate_year
+
+    _bind_local_tracks_if_owned(tracks, owned_status)
 
     payload = {
         "id": str(data.get("id")),

@@ -535,7 +535,7 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
             else:
                 self._send_json({"error": "Failed to delete album or invalid path"}, 400)
 
-        elif route == "open-album-folder":
+        elif route in ["open-album-folder", "open-path"]:
             path_str = data.get("path") or ""
             if path_str and Path(path_str).exists():
                 if os.name == "nt":

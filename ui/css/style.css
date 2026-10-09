@@ -636,11 +636,30 @@ body.modal-open .player-dock-pill {
   transition: opacity 0.2s ease, transform 0.2s ease, visibility 0.2s !important;
 }
 
-/* Prevent dock pill from colliding with right side drawer */
+/* Prevent floating player and dock pill from colliding with right side drawers */
 body:has(#queueDrawer:not(.hidden)) .player-dock-pill,
 body:has(#inspectDrawer:not(.hidden)) .player-dock-pill {
   right: auto !important;
   left: 28px !important;
+}
+
+@media (min-width: 1351px) {
+  body:has(#queueDrawer:not(.hidden)) .smart-player-hud,
+  body:has(#inspectDrawer:not(.hidden)) .smart-player-hud {
+    left: calc(50% - 240px) !important;
+    max-width: calc(100vw - 520px) !important;
+    transition: left 0.25s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.25s ease !important;
+  }
+}
+
+@media (max-width: 1350px) {
+  body:has(#queueDrawer:not(.hidden)) .smart-player-hud,
+  body:has(#inspectDrawer:not(.hidden)) .smart-player-hud {
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transform: translateX(-50%) translateY(45px) scale(0.98) !important;
+    visibility: hidden !important;
+  }
 }
 
 @keyframes fadeIn {
@@ -5428,8 +5447,8 @@ body:has(#inspectDrawer:not(.hidden)) .player-dock-pill {
   }
 }
 
-@media (max-width: 1050px) {
-  /* Restored / Floating Desktop Window (~950px - 1050px) */
+@media (max-width: 1180px) {
+  /* Restored / Floating Desktop Window (~950px - 1180px) */
   .station-sidebar {
     width: 224px;
   }
