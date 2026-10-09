@@ -47,4 +47,3 @@ scripts/PUSH_TO_GITHUB.bat
 scripts/PROMOTE_TO_STABLE.bat
 scripts/promote_stable.py
 scripts/HOW_UPDATES_WORK.txt
-ui/js/modules/
