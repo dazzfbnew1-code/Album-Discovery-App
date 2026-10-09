@@ -285,8 +285,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const ALBUM_MODAL_CACHE = new Map();
 
   const ERA_TITLES = {
-    "all": "🔥 Official Top 100 Studio Albums",
-    "top_singles": "⚡ Official Top 100 Singles & Hits",
+    "all": "🔥 Top Landmark Studio Albums",
+    "top_singles": "⚡ Top Singles & Chart Hits",
     "pop": "✨ Trending Pop & Hot Hits",
     "30s_40s": "🎺 30s & 40s Swing & Big Band Masters",
     "50s": "🎙️ 50s Rock 'n' Roll & Golden Era",
@@ -1263,9 +1263,10 @@ document.addEventListener("DOMContentLoaded", () => {
         loadingIndicator.classList.add("hidden");
         emptyIndicator.classList.add("hidden");
         if (btnRefreshView) btnRefreshView.classList.remove("spinning");
-        viewSectionCount.textContent = `${cachedAlbums.length} landmark albums`;
+        const labelSuffix = (genre === "top_singles") ? "chart singles & hits" : "landmark albums";
+        viewSectionCount.textContent = `${Number(cachedAlbums.length).toLocaleString()} ${labelSuffix}`;
         renderCurrentView(cachedAlbums, true);
-        if (cachedAlbums.length >= 850) {
+        if (cachedAlbums.length >= 800) {
           return;
         }
       }
@@ -1318,7 +1319,8 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         sessionStorage.setItem("tab_cache_" + genre, JSON.stringify(albums.slice(0, 250)));
       } catch (e) {}
-      viewSectionCount.textContent = `${albums.length} landmark albums`;
+      const labelSuffix = (genre === "top_singles") ? "chart singles & hits" : "landmark albums";
+      viewSectionCount.textContent = `${Number(albums.length).toLocaleString()} ${labelSuffix}`;
       renderCurrentView(albums);
     } catch (err) {
       console.error("Failed to load charts:", err);

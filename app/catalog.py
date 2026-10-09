@@ -126,12 +126,31 @@ def fetch_era_albums_dynamically(start_year: int, end_year: int) -> list:
             "Glenn Miller", "Duke Ellington", "Billie Holiday", "Ella Fitzgerald",
             "Louis Armstrong", "Count Basie", "Tommy Dorsey", "Frank Sinatra",
             "Bing Crosby", "Benny Goodman", "Artie Shaw", "Cab Calloway",
-            "Django Reinhardt", "Fats Waller", "Coleman Hawkins", "Lester Young"
+            "Django Reinhardt", "Fats Waller", "Coleman Hawkins", "Lester Young",
+            "Nat King Cole", "Woody Herman", "Gene Krupa", "Harry James"
         ])
     elif start_year == 1950:
         legend_pool.extend([
+            "Elvis Presley", "Chuck Berry", "Little Richard", "Buddy Holly",
             "Bill Haley", "Fats Domino", "Jerry Lee Lewis", "Everly Brothers",
-            "Sam Cooke", "Hank Williams", "Bo Diddley", "Muddy Waters"
+            "Sam Cooke", "Hank Williams", "Bo Diddley", "Muddy Waters",
+            "Ray Charles", "Johnny Cash", "Miles Davis", "John Coltrane", "Chet Baker"
+        ])
+    elif start_year == 1960:
+        legend_pool.extend([
+            "The Beatles", "The Rolling Stones", "Bob Dylan", "The Who",
+            "The Beach Boys", "The Doors", "Jimi Hendrix", "Led Zeppelin",
+            "Pink Floyd", "Cream", "The Kinks", "Simon & Garfunkel",
+            "Aretha Franklin", "Otis Redding", "The Temptations", "Marvin Gaye"
+        ])
+    elif start_year == 1990:
+        legend_pool.extend([
+            "Nirvana", "Pearl Jam", "Soundgarden", "Alice in Chains",
+            "Radiohead", "Oasis", "Blur", "Smashing Pumpkins",
+            "Green Day", "Weezer", "Red Hot Chili Peppers", "R.E.M.",
+            "Tupac", "Notorious BIG", "Nas", "Wu-Tang Clan", "Snoop Dogg", "Dr Dre",
+            "Alanis Morissette", "Foo Fighters", "Blink-182", "Korn", "Pantera",
+            "Lauryn Hill", "Fatboy Slim", "Chemical Brothers", "Beck", "Massive Attack", "Portishead"
         ])
 
     # Deduplicate legend pool
@@ -228,7 +247,7 @@ def get_genre_charts(genre: str = "all", limit: int = 100, force_refresh: bool =
     # If not forcing refresh, dynamically stamp live ownership on cached albums before returning
     if not force_refresh and cached:
         albs = cached.get("albums", []) if isinstance(cached, dict) else cached
-        target_min = 900 if (limit == 0 or limit >= 500) else min(limit, 75)
+        target_min = 800 if (limit == 0 or limit >= 500) else min(limit, 75)
         if len(albs) >= target_min:
             for a in albs:
                 st = is_album_owned(a.get("artist", ""), a.get("title", ""))
@@ -242,8 +261,9 @@ def get_genre_charts(genre: str = "all", limit: int = 100, force_refresh: bool =
 
     decade_bounds = parse_decade_range(genre_clean)
 
-    # 0. Official Top 100 Singles Chart (Direct Official Chart Ranking)
+    # 0. Official Top Singles Chart & Global Drops (1,000+ deep pool)
     if genre_clean in ["top_singles", "singles", "top100_singles"]:
+        # A. Official Global Top Track Chart
         chart_tracks = fetch_json("https://api.deezer.com/chart/0/tracks?limit=150", timeout=5)
         if chart_tracks and isinstance(chart_tracks, dict) and "data" in chart_tracks:
             for t in chart_tracks["data"]:
@@ -261,22 +281,121 @@ def get_genre_charts(genre: str = "all", limit: int = 100, force_refresh: bool =
                     "record_type": "single"
                 })
 
-    # 1. If it's a standard genre in Deezer's catalog, query live charts & live genre artists & deep subqueries
+        # B. Multi-genre top track charts (Pop, Rap, Rock, Dance, R&B, Electronic, Indie)
+        genre_track_gids = [132, 116, 152, 113, 165, 106, 85]
+        def _fetch_genre_tracks(gid):
+            t_data = fetch_json(f"https://api.deezer.com/chart/{gid}/tracks?limit=100", timeout=4)
+            items = []
+            if t_data and isinstance(t_data, dict) and "data" in t_data:
+                for t in t_data["data"]:
+                    alb = t.get("album") or {}
+                    items.append({
+                        "id": str(alb.get("id") or t.get("id")),
+                        "title": t.get("title") or alb.get("title") or "Single",
+                        "artist": t.get("artist") or {"name": "Unknown Artist"},
+                        "cover_small": alb.get("cover_medium") or alb.get("cover_small") or "",
+                        "cover_big": alb.get("cover_xl") or alb.get("cover_big") or "",
+                        "cover_medium": alb.get("cover_medium") or "",
+                        "cover_xl": alb.get("cover_xl") or "",
+                        "release_date": t.get("release_date") or "",
+                        "nb_tracks": 1,
+                        "record_type": "single"
+                    })
+            return items
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for t_items in ex.map(_fetch_genre_tracks, genre_track_gids):
+                raw_list.extend(t_items)
+
+        # C. Rich trending singles and chart hits search queries
+        single_kws = [
+            "top hits", "billboard hot 100", "chart hits", "viral hits", "uk top 40",
+            "global top 50", "trending hits", "number 1 hits", "club hits", "greatest singles",
+            "summer hits", "pop singles", "dance anthems", "chart toppers", "radio hits",
+            "mega hits", "hot tracks", "spotify top 50", "apple music top 100", "pop chart",
+            "urban hits", "indie hits", "electronic anthems"
+        ]
+        def _fetch_single_kw(kw):
+            t_res = fetch_json(f"https://api.deezer.com/search/track?q={urllib.parse.quote(kw)}&limit=100", timeout=3.5)
+            items = []
+            if t_res and isinstance(t_res, dict) and "data" in t_res:
+                for t in t_res["data"]:
+                    alb = t.get("album") or {}
+                    items.append({
+                        "id": str(alb.get("id") or t.get("id")),
+                        "title": t.get("title") or alb.get("title") or "Single",
+                        "artist": t.get("artist") or {"name": "Unknown Artist"},
+                        "cover_small": alb.get("cover_medium") or alb.get("cover_small") or "",
+                        "cover_big": alb.get("cover_xl") or alb.get("cover_big") or "",
+                        "cover_medium": alb.get("cover_medium") or "",
+                        "cover_xl": alb.get("cover_xl") or "",
+                        "release_date": t.get("release_date") or "",
+                        "nb_tracks": 1,
+                        "record_type": "single"
+                    })
+            return items
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for kw_items in ex.map(_fetch_single_kw, single_kws):
+                raw_list.extend(kw_items)
+
+    # 1. Top Landmark Studio Albums (1,000 landmark albums across all genres)
+    elif genre_clean == "all":
+        # A. Deezer global album chart + major genre charts
+        landmark_gids = [0, 132, 152, 116, 113, 165, 464, 106, 85, 129]
+        def _fetch_genre_chart_albs(gid):
+            c_data = fetch_json(f"https://api.deezer.com/chart/{gid}/albums?limit=100", timeout=4)
+            return c_data.get("data", []) if c_data and "data" in c_data else []
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for c_items in ex.map(_fetch_genre_chart_albs, landmark_gids):
+                raw_list.extend(c_items)
+
+        # B. Multi-search across rich landmark subqueries
+        sub_kws = GENRE_SUBQUERIES.get("all", [
+            "top albums", "greatest hits albums", "classic albums", "iconic albums",
+            "masterpiece albums", "platinum albums", "essential albums", "critics choice albums",
+            "chart hits", "award winning albums", "legendary albums", "hall of fame albums"
+        ])
+        def _fetch_subgenre_all(kw):
+            res = fetch_json(f"https://api.deezer.com/search/album?q={urllib.parse.quote(kw)}&limit=100", timeout=3.5)
+            return res.get("data", []) if res else []
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            for items in ex.map(_fetch_subgenre_all, sub_kws):
+                raw_list.extend(items)
+
+        # C. Harvest landmark studio discographies from iconic legends across genres
+        landmark_artists = [
+            "The Beatles", "Michael Jackson", "Queen", "Pink Floyd", "David Bowie",
+            "Led Zeppelin", "Fleetwood Mac", "The Rolling Stones", "Bob Dylan",
+            "Stevie Wonder", "Prince", "Elton John", "Madonna", "Nirvana",
+            "Radiohead", "Eminem", "Kendrick Lamar", "Beyoncé", "Taylor Swift",
+            "Coldplay", "Daft Punk", "The Weeknd", "Adele", "Drake", "Bob Marley",
+            "Miles Davis", "Frank Sinatra"
+        ]
+        def _fetch_landmark_artist_albs(art_name):
+            sub_items = []
+            try:
+                q_enc = urllib.parse.quote(art_name)
+                art_res = fetch_json(f"https://api.deezer.com/search/album?q={q_enc}&limit=25", timeout=3.0)
+                if art_res and "data" in art_res:
+                    for it in art_res["data"]:
+                        sub_items.append(it)
+            except Exception:
+                pass
+            return sub_items
+
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            for sub in ex.map(_fetch_landmark_artist_albs, landmark_artists):
+                raw_list.extend(sub)
+
+    # 2. If it's a specific genre in Deezer's catalog, query live charts & live genre artists & deep subqueries
     elif genre_clean in DEEZER_GENRE_MAP and not decade_bounds:
         gid = DEEZER_GENRE_MAP[genre_clean]
         chart_data = fetch_json(f"https://api.deezer.com/chart/{gid}/albums?limit=100", timeout=4)
         if chart_data and isinstance(chart_data, dict) and "data" in chart_data:
             raw_list.extend(chart_data["data"])
-            
-        # For singles chart, pull top tracks. For albums, keep strictly to albums chart
-        if genre_clean in ["top_singles", "singles", "top100_singles"]:
-            track_chart = fetch_json(f"https://api.deezer.com/chart/{gid}/tracks?limit=100", timeout=4)
-            if track_chart and isinstance(track_chart, dict) and "data" in track_chart:
-                for t in track_chart["data"]:
-                    alb = t.get("album")
-                    if alb:
-                        alb["artist"] = t.get("artist") or alb.get("artist")
-                        raw_list.append(alb)
 
         # Multi-search across rich subgenre queries for 1,000+ deep pool
         sub_kws = GENRE_SUBQUERIES.get(genre_clean, [f"{genre_clean} albums", f"best {genre_clean}", f"classic {genre_clean}"])
