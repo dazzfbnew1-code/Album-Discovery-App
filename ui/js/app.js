@@ -1574,7 +1574,13 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="card-artist" title="${album.artist}">${album.artist}</div>
       `;
 
-      card.addEventListener("click", () => openInspectDrawer(album.id));
+      card.addEventListener("click", () => {
+        if (currentViewType === "library" || String(album.id).startsWith("local_")) {
+          openAlbumModal(album.id);
+        } else {
+          openInspectDrawer(album.id);
+        }
+      });
       albumsGrid.appendChild(card);
     });
   }
@@ -1628,7 +1634,13 @@ document.addEventListener("DOMContentLoaded", () => {
         </td>
       `;
 
-      tr.addEventListener("click", () => openInspectDrawer(album.id));
+      tr.addEventListener("click", () => {
+        if (currentViewType === "library" || String(album.id).startsWith("local_")) {
+          openAlbumModal(album.id);
+        } else {
+          openInspectDrawer(album.id);
+        }
+      });
       albumsTableBody.appendChild(tr);
     });
   }
@@ -2901,6 +2913,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function openAlbumModal(albumId) {
+    closeInspectDrawer();
     albumModal.classList.remove("hidden");
     switchModalTab("tracks");
 
@@ -2932,7 +2945,8 @@ document.addEventListener("DOMContentLoaded", () => {
           tracks: currentTracklist
         };
       } else if (String(albumId).startsWith("local_")) {
-        const matchingAlb = currentDisplayedAlbums.find(a => String(a.id) === String(albumId));
+        const matchingAlb = (currentDisplayedAlbums && currentDisplayedAlbums.find(a => String(a.id) === String(albumId)))
+          || (localLibraryAlbums && localLibraryAlbums.find(a => String(a.id) === String(albumId)));
         const ownedPath = matchingAlb ? (matchingAlb.owned_path || "") : "";
         const res = await fetch(`/api/library/album-details?path=${encodeURIComponent(ownedPath)}`);
         data = await res.json();
