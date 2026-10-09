@@ -2,6 +2,7 @@ import os
 import re
 import time
 import shutil
+import tempfile
 import threading
 import importlib
 import urllib.request
@@ -602,8 +603,7 @@ class DownloadManager:
             "ignore_no_formats_error": True,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android", "ios", "web"],
-                    "player_skip": ["webpage", "configs"]
+                    "player_client": ["android", "ios"]
                 }
             },
             "http_headers": {
@@ -638,14 +638,102 @@ class DownloadManager:
             "ignoreerrors": True,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android", "ios", "web"],
-                    "player_skip": ["webpage", "configs"]
+                    "player_client": ["android", "ios"]
                 }
             },
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             }
         }
+
+        def _attempt_candidate_download(cid: str) -> tuple[bool, Exception | None]:
+            """Execute tiered resolution: Tier 1 (Mobile Emulation) -> Tier 2 (Edge / Cookies Fallback)."""
+            target = f"https://www.youtube.com/watch?v={cid}" if not cid.startswith("ytsearch") else cid
+            
+            # --- TIER 1: Zero-Configuration Mobile Emulation ---
+            tier1_opts = dict(ydl_opts)
+            tier1_opts["extractor_args"] = {
+                "youtube": {
+                    "player_client": ["android", "ios"]
+                }
+            }
+            
+            last_candidate_err = None
+            try:
+                with yt_dlp.YoutubeDL(tier1_opts) as ydl:
+                    ydl.download([target])
+                if safe_out.exists() and safe_out.stat().st_size > 50000:
+                    return True, None
+            except Exception as t1_err:
+                last_candidate_err = t1_err
+                log_warn(f"    [TIER 1] Mobile emulation for '{cid}' encountered error: {t1_err}. Escalating to Tier 2 (Edge fallback)...")
+                _cleanup_partial_artifacts()
+
+            # --- TIER 2: Automatic Microsoft Edge Fallback ---
+            # Handle Windows Chromium file locks gracefully (e.g. copying Edge cookie database to temp dir)
+            edge_temp_dir = None
+            try:
+                edge_data = Path(os.path.expandvars(r"%LOCALAPPDATA%\Microsoft\Edge\User Data"))
+                cookie_src = edge_data / "Default" / "Network" / "Cookies"
+                local_state = edge_data / "Local State"
+                if cookie_src.exists():
+                    td = Path(tempfile.mkdtemp(prefix="edge_cookies_"))
+                    nd = td / "Default" / "Network"
+                    nd.mkdir(parents=True, exist_ok=True)
+                    try:
+                        shutil.copy2(str(cookie_src), str(nd / "Cookies"))
+                        if local_state.exists():
+                            shutil.copy2(str(local_state), str(td / "Local State"))
+                        edge_temp_dir = str(td)
+                    except PermissionError:
+                        shutil.rmtree(str(td), ignore_errors=True)
+                        log_warn("    [TIER 2] Edge cookie file locked by active browser session; proceeding to direct/cookiefile resolution.")
+                    except Exception as copy_err:
+                        shutil.rmtree(str(td), ignore_errors=True)
+                        log_warn(f"    [TIER 2] Edge cookie copy note: {copy_err}")
+            except Exception as edge_inspect_err:
+                log_warn(f"    [TIER 2] Chromium lock inspection note: {edge_inspect_err}")
+
+            tier2_strategies = []
+            if edge_temp_dir:
+                opts_temp = dict(ydl_opts)
+                opts_temp.pop("extractor_args", None)
+                opts_temp["cookiesfrombrowser"] = ("edge", edge_temp_dir)
+                tier2_strategies.append(("edge_temp_copy", opts_temp))
+
+            opts_edge_dir = dict(ydl_opts)
+            opts_edge_dir.pop("extractor_args", None)
+            opts_edge_dir["cookiesfrombrowser"] = ("edge",)
+            tier2_strategies.append(("edge_direct", opts_edge_dir))
+
+            # Bundled/user offline cookies fallback for headless workstation stability
+            cookies_file = Path(__file__).parent.parent / "data" / "cookies.txt"
+            if cookies_file.exists():
+                opts_cf = dict(ydl_opts)
+                opts_cf.pop("extractor_args", None)
+                opts_cf["cookiefile"] = str(cookies_file)
+                tier2_strategies.append(("cookies_file", opts_cf))
+
+            try:
+                for strat_name, strat_opts in tier2_strategies:
+                    try:
+                        with yt_dlp.YoutubeDL(strat_opts) as ydl:
+                            ydl.download([target])
+                        if safe_out.exists() and safe_out.stat().st_size > 50000:
+                            log_download(f"    [TIER 2 SUCCESS ✓] Candidate '{cid}' downloaded via {strat_name}")
+                            return True, None
+                    except Exception as t2_err:
+                        last_candidate_err = t2_err
+                        log_warn(f"    [TIER 2] Strategy '{strat_name}' failed for '{cid}': {t2_err}")
+                        _cleanup_partial_artifacts()
+            finally:
+                if edge_temp_dir:
+                    try:
+                        shutil.rmtree(edge_temp_dir, ignore_errors=True)
+                    except Exception:
+                        pass
+
+            return False, last_candidate_err
 
         candidate_ids = []
         try:
@@ -669,17 +757,13 @@ class DownloadManager:
 
         last_err = None
         for cid in candidate_ids:
-            target = f"https://www.youtube.com/watch?v={cid}" if not cid.startswith("ytsearch") else cid
-            try:
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([target])
-                if safe_out.exists() and safe_out.stat().st_size > 50000:
-                    return
-            except Exception as e:
-                last_err = e
-                log_warn(f"    [RETRY] Candidate '{cid}' failed: {e}. Trying next candidate...")
-                _cleanup_partial_artifacts()
-                time.sleep(0.2)
+            success, err = _attempt_candidate_download(cid)
+            if success and safe_out.exists() and safe_out.stat().st_size > 50000:
+                return
+            last_err = err
+            log_warn(f"    [RETRY] Candidate '{cid}' failed. Trying next candidate...")
+            _cleanup_partial_artifacts()
+            time.sleep(0.2)
 
         # Automatic Search Fallback for Failed Downloads:
         if not safe_out.exists() or safe_out.stat().st_size < 50000:
@@ -712,18 +796,14 @@ class DownloadManager:
                 fallback_candidate_ids = [f"ytsearch1:{primary_art} - {core_title} official audio"]
 
             for cid in fallback_candidate_ids:
-                target = f"https://www.youtube.com/watch?v={cid}" if not cid.startswith("ytsearch") else cid
-                try:
-                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                        ydl.download([target])
-                    if safe_out.exists() and safe_out.stat().st_size > 50000:
-                        log_download(f"  [FALLBACK SUCCESS ✓] Successfully recovered and downloaded '{title}' using fallback '{primary_art} - {core_title}'")
-                        return
-                except Exception as e:
-                    last_err = e
-                    log_warn(f"    [FALLBACK CANDIDATE RETRY] Candidate '{cid}' failed: {e}. Trying next fallback candidate...")
-                    _cleanup_partial_artifacts()
-                    time.sleep(0.2)
+                success, err = _attempt_candidate_download(cid)
+                if success and safe_out.exists() and safe_out.stat().st_size > 50000:
+                    log_download(f"  [FALLBACK SUCCESS ✓] Successfully recovered and downloaded '{title}' using fallback '{primary_art} - {core_title}'")
+                    return
+                last_err = err
+                log_warn(f"    [FALLBACK CANDIDATE RETRY] Candidate '{cid}' failed. Trying next fallback candidate...")
+                _cleanup_partial_artifacts()
+                time.sleep(0.2)
 
         if not safe_out.exists() or safe_out.stat().st_size < 50000:
             _cleanup_partial_artifacts()

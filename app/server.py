@@ -90,10 +90,14 @@ def resolve_full_audio_stream(artist: str, title: str) -> dict:
             "skip_download": True,
             "extractor_args": {
                 "youtube": {
-                    "player_client": ["android", "ios", "web"]
+                    "player_client": ["android", "ios"]
                 }
             }
         }
+        cookies_file = Path(__file__).parent.parent / "data" / "cookies.txt"
+        if cookies_file.exists():
+            stream_opts["cookiefile"] = str(cookies_file)
+            search_opts["cookiefile"] = str(cookies_file)
 
         with yt_dlp.YoutubeDL(stream_opts) as stream_ydl:
             for cid in candidate_ids:

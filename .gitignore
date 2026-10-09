@@ -41,6 +41,7 @@ desktop.ini
 
 # Personal local configs & developer tools (stay on PC only)
 data/config.json
+data/cookies.txt
 AGENTS.md
 PUSH_TO_GITHUB.bat
 PROMOTE_TO_STABLE.bat
