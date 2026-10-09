@@ -123,9 +123,10 @@ def scan_local_library(custom_root: str = None) -> dict:
                 p_str = row["dest_path"] or ""
                 art_name = row["artist"] or ""
                 alb_name = row["title"] or ""
-                if "$recycle" in art_name.lower() or "$recycle" in alb_name.lower() or "$recycle" in p_str.lower():
+                if not p_str or len(p_str) <= 3 or "$recycle" in art_name.lower() or "$recycle" in alb_name.lower() or "$recycle" in p_str.lower():
                     continue
-                if p_str and is_ignored_path(Path(p_str)):
+                p_obj = Path(p_str)
+                if not p_obj.exists() or not p_obj.is_dir() or is_ignored_path(p_obj):
                     continue
                 key = make_album_key(art_name, alb_name)
                 alb_info = {
@@ -279,7 +280,10 @@ def init_library_cache():
                 p_str = row["dest_path"] or ""
                 art_name = row["artist"] or ""
                 alb_name = row["title"] or ""
-                if "$recycle" in art_name.lower() or "$recycle" in alb_name.lower() or "$recycle" in p_str.lower():
+                if not p_str or len(p_str) <= 3 or "$recycle" in art_name.lower() or "$recycle" in alb_name.lower() or "$recycle" in p_str.lower():
+                    continue
+                p_obj = Path(p_str)
+                if not p_obj.exists() or not p_obj.is_dir() or is_ignored_path(p_obj):
                     continue
                 key = make_album_key(art_name, alb_name)
                 alb_info = {

@@ -33,6 +33,19 @@ def get_accurate_cover_art(
                 return art.replace("100x100bb", "1000x1000bb")
     except Exception:
         pass
+
+    # Fallback to Deezer album search if iTunes misses
+    try:
+        q_dz = urllib.parse.quote(f"{clean_artist} {clean_album}")
+        dz_data = fetch_json(f"https://api.deezer.com/search/album?q={q_dz}&limit=3", timeout=3)
+        if dz_data and dz_data.get("data"):
+            for alb_item in dz_data["data"]:
+                cov = alb_item.get("cover_xl") or alb_item.get("cover_big") or alb_item.get("cover_medium") or ""
+                if cov:
+                    return cov
+    except Exception:
+        pass
+
     return ""
 
 

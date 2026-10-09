@@ -262,21 +262,28 @@ class DownloadManager:
                     job["status"] = "complete"
                     job["progress_pct"] = 100
                     job["current_track_pct"] = 100
-                    dest_dir = str(CONFIG.get("download_root") or CONFIG.get("music_root", DEFAULT_DOWNLOAD_DIR))
-                    record_download(job, dest_dir)
-                    try:
-                        from .library import register_downloaded_album, scan_local_library
-                        register_downloaded_album(
-                            artist=job.get("artist", ""),
-                            album=job.get("title", ""),
-                            dest_path=dest_dir,
-                            track_count=job.get("total_tracks", 0),
-                            album_id=str(job.get("id", ""))
-                        )
-                        if CONFIG.get("auto_rescan_on_download", True):
+                    dest_dir = str(job.get("dest_path") or CONFIG.get("download_root") or CONFIG.get("music_root", DEFAULT_DOWNLOAD_DIR))
+                    is_single_track = "_tr_" in str(job.get("id", "")) or job.get("total_tracks", 1) <= 1
+                    if not is_single_track and len(dest_dir) > 3:
+                        record_download(job, dest_dir)
+                        try:
+                            from .library import register_downloaded_album
+                            register_downloaded_album(
+                                artist=job.get("artist", ""),
+                                album=job.get("title", ""),
+                                dest_path=dest_dir,
+                                track_count=job.get("total_tracks", 0),
+                                album_id=str(job.get("id", ""))
+                            )
+                        except Exception as reg_err:
+                            log_error(f"Register downloaded album failed: {reg_err}")
+
+                    if CONFIG.get("auto_rescan_on_download", True):
+                        try:
+                            from .library import scan_local_library
                             threading.Thread(target=scan_local_library, daemon=True).start()
-                    except Exception as scan_err:
-                        log_error(f"Auto-rescan on download completion failed: {scan_err}")
+                        except Exception as scan_err:
+                            log_error(f"Auto-rescan on download completion failed: {scan_err}")
             except Exception as e:
                 job["status"] = "failed"
                 job["error"] = str(e)
@@ -324,6 +331,7 @@ class DownloadManager:
 
         album_dir = sanitize_path(album_dir)
         album_dir.mkdir(parents=True, exist_ok=True)
+        job["dest_path"] = str(album_dir)
 
         cover_path = album_dir / "cover.jpg"
         if cover_url and not cover_path.exists() and CONFIG.get("save_cover_jpg", True):
