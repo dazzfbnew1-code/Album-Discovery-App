@@ -694,32 +694,33 @@ class DownloadManager:
                         edge_temp_dir = str(td)
                     except PermissionError:
                         shutil.rmtree(str(td), ignore_errors=True)
-                        log_warn("    [TIER 2] Edge cookie file locked by active browser session; proceeding to direct/cookiefile resolution.")
-                    except Exception as copy_err:
+                    except Exception:
                         shutil.rmtree(str(td), ignore_errors=True)
-                        log_warn(f"    [TIER 2] Edge cookie copy note: {copy_err}")
-            except Exception as edge_inspect_err:
-                log_warn(f"    [TIER 2] Chromium lock inspection note: {edge_inspect_err}")
+            except Exception:
+                pass
 
             tier2_strategies = []
-            if edge_temp_dir:
-                opts_temp = dict(ydl_opts)
-                opts_temp.pop("extractor_args", None)
-                opts_temp["cookiesfrombrowser"] = ("edge", edge_temp_dir)
-                tier2_strategies.append(("edge_temp_copy", opts_temp))
 
-            opts_edge_dir = dict(ydl_opts)
-            opts_edge_dir.pop("extractor_args", None)
-            opts_edge_dir["cookiesfrombrowser"] = ("edge",)
-            tier2_strategies.append(("edge_direct", opts_edge_dir))
-
-            # Bundled/user offline cookies fallback for headless workstation stability
+            # 1. Prioritize verified offline cookies pool if present (zero latency, no browser locks)
             cookies_file = Path(__file__).parent.parent / "data" / "cookies.txt"
             if cookies_file.exists():
                 opts_cf = dict(ydl_opts)
                 opts_cf.pop("extractor_args", None)
                 opts_cf["cookiefile"] = str(cookies_file)
                 tier2_strategies.append(("cookies_file", opts_cf))
+
+            # 2. Microsoft Edge temporary database copy (handles running browser locks)
+            if edge_temp_dir:
+                opts_temp = dict(ydl_opts)
+                opts_temp.pop("extractor_args", None)
+                opts_temp["cookiesfrombrowser"] = ("edge", edge_temp_dir)
+                tier2_strategies.append(("edge_temp_copy", opts_temp))
+
+            # 3. Direct Microsoft Edge browser extraction
+            opts_edge_dir = dict(ydl_opts)
+            opts_edge_dir.pop("extractor_args", None)
+            opts_edge_dir["cookiesfrombrowser"] = ("edge",)
+            tier2_strategies.append(("edge_direct", opts_edge_dir))
 
             try:
                 for strat_name, strat_opts in tier2_strategies:
@@ -731,7 +732,6 @@ class DownloadManager:
                             return True, None
                     except Exception as t2_err:
                         last_candidate_err = t2_err
-                        log_warn(f"    [TIER 2] Strategy '{strat_name}' failed for '{cid}': {t2_err}")
                         _cleanup_partial_artifacts()
             finally:
                 if edge_temp_dir:
@@ -740,6 +740,8 @@ class DownloadManager:
                     except Exception:
                         pass
 
+            if last_candidate_err:
+                log_warn(f"    [TIER 2] All fallback strategies exhausted for candidate '{cid}': {last_candidate_err}")
             return False, last_candidate_err
 
         candidate_ids = []
