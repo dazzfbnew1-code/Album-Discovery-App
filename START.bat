@@ -33,10 +33,21 @@ if %errorlevel% equ 0 (
     )
 )
 
-:: 2. Ensure Desktop & App Shortcuts with Custom Icon exist
+:: 2. Silently check for updates from GitHub (Dad release mode)
+where py >nul 2>nul
+if %errorlevel% equ 0 (
+    py "%~dp0scripts\check_update.py" >nul 2>nul
+) else (
+    where python >nul 2>nul
+    if %errorlevel% equ 0 (
+        python "%~dp0scripts\check_update.py" >nul 2>nul
+    )
+)
+
+:: 3. Ensure Desktop & App Shortcuts with Custom Icon exist
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\update_lnk.ps1" >nul 2>nul
 
-:: 3. Launch in Windowless GUI Mode (No persistent console window)
+:: 4. Launch in Windowless GUI Mode (No persistent console window)
 where pyw >nul 2>nul
 if %errorlevel% equ 0 (
     start "" pyw -3 main.py
