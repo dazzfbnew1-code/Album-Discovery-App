@@ -511,6 +511,9 @@ def backfill_missing_covers(custom_root: str = None) -> dict:
                     except Exception as e:
                         log_error(f"Failed to save backfilled cover for {item.get('album')}: {e}")
 
+    if backfilled > 0:
+        scan_local_library()
+
     return {"status": "complete", "backfilled_count": backfilled}
 
 def get_library_dj_radio(limit: int = None) -> dict:
