@@ -20,7 +20,7 @@ DEFAULT_CONFIG = {
     "audio_quality": "320k",
     "folder_structure": "artist_album_year",
     "download_concurrency": 4,
-    "save_lrc_lyrics": False,
+    "save_lrc_lyrics": True,
     "embed_cover_art": True,
     "save_cover_jpg": True,
     "filter_junk": True,

@@ -421,6 +421,25 @@ class DownloadManager:
                 embed_art = CONFIG.get("embed_cover_art", True)
                 cov_to_embed = str(cover_path) if (embed_art and cover_path.exists()) else ""
 
+                # Fetch lyrics subtitles (synced LRC / plain lyrics)
+                track_lyrics_text = ""
+                try:
+                    from .lyrics import get_track_lyrics
+                    lyr_data = get_track_lyrics(tr_artist, tr_title, album, tr.get("duration", 0))
+                    if lyr_data:
+                        synced = lyr_data.get("synced") or ""
+                        plain = lyr_data.get("plain") or ""
+                        track_lyrics_text = plain or synced
+
+                        # Auto-save synchronized .lrc companion subtitle file in album folder
+                        if CONFIG.get("save_lrc_lyrics", True) and (synced or plain):
+                            lrc_content = synced or plain
+                            lrc_file = sanitize_path(album_dir / f"{tr_num:02d} - {safe_title}.lrc")
+                            lrc_file.write_text(lrc_content, encoding="utf-8")
+                            log_download(f"  [SUBTITLES / LRC] Saved companion {lrc_file.name}")
+                except Exception:
+                    pass
+
                 if ext == "mp3" and out_file.exists():
                     tag_mp3_file(
                         str(out_file),
@@ -431,24 +450,13 @@ class DownloadManager:
                         total_tracks=total,
                         year=year,
                         genre=CONFIG.get("default_genre", "Music"),
-                        cover_path=cov_to_embed
+                        cover_path=cov_to_embed,
+                        lyrics=track_lyrics_text
                     )
-                    log_download(f"  [TRACK {idx}/{total} TAGGED ✓] ID3 tags & artwork embedded in {out_filename}")
+                    log_download(f"  [TRACK {idx}/{total} TAGGED ✓] ID3 tags, artwork & lyrics embedded in {out_filename}")
                 elif HAS_MUTAGEN and out_file.exists():
-                    self._tag_audio_file(str(out_file), tr_title, tr_artist, album, tr_num, total, year, cov_to_embed or None, ext)
-                    log_download(f"  [TRACK {idx}/{total} TAGGED ✓] ID3 tags written to {out_filename}")
-
-                # Auto-save synchronized .lrc lyrics file alongside track (disabled by default)
-                if CONFIG.get("save_lrc_lyrics", False):
-                    try:
-                        from .lyrics import get_track_lyrics
-                        lyr_data = get_track_lyrics(artist, tr_title, album, tr.get("duration", 0))
-                        if lyr_data and lyr_data.get("synced"):
-                            lrc_file = sanitize_path(album_dir / f"{tr_num:02d} - {safe_title}.lrc")
-                            lrc_file.write_text(lyr_data["synced"], encoding="utf-8")
-                            log_download(f"  [LYRICS SYNC] Saved .lrc lyrics to {lrc_file.name}")
-                    except Exception:
-                        pass
+                    self._tag_audio_file(str(out_file), tr_title, tr_artist, album, tr_num, total, year, cov_to_embed or None, ext, lyrics=track_lyrics_text)
+                    log_download(f"  [TRACK {idx}/{total} TAGGED ✓] Audio tags written to {out_filename}")
 
                 with progress_lock:
                     completed_count += 1
@@ -858,7 +866,7 @@ class DownloadManager:
             err_msg = str(last_err) if last_err else "No playable audio stream or candidates resolved across primary and fallback searches"
             raise RuntimeError(f"Could not download audio track '{title}': {err_msg}")
 
-    def _tag_audio_file(self, file_path: str, title: str, artist: str, album: str, track_no: int, total_tracks: int, year: str, cover_path: str = None, ext: str = "mp3"):
+    def _tag_audio_file(self, file_path: str, title: str, artist: str, album: str, track_no: int, total_tracks: int, year: str, cover_path: str = None, ext: str = "mp3", lyrics: str = ""):
         try:
             if ext == "m4a" and MP4:
                 audio = MP4(file_path)
@@ -868,6 +876,7 @@ class DownloadManager:
                 audio["\xa9alb"] = [album]
                 audio["trkn"] = [(track_no, total_tracks)]
                 if year: audio["\xa9day"] = [str(year)]
+                if lyrics: audio["\xa9lyr"] = [lyrics]
                 if cover_path and Path(cover_path).exists() and MP4Cover:
                     with open(cover_path, "rb") as f:
                         audio["covr"] = [MP4Cover(f.read(), imageformat=MP4Cover.FORMAT_JPEG)]

@@ -7,6 +7,7 @@ DB_DIR = Path(__file__).resolve().parent.parent / "data"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DISCOVERY_DB_PATH = DB_DIR / "discovery.db"
 LIBRARY_DB_PATH = DB_DIR / "music_library.db"
+LYRICS_DB_PATH = DB_DIR / "lyrics.db"
 DB_PATH = DISCOVERY_DB_PATH
 
 def _create_wal_connection(db_file: Path):
@@ -29,6 +30,10 @@ def get_conn():
 def get_library_conn():
     """Returns WAL connection to the Personal Music Library database (music_library.db)."""
     return _create_wal_connection(LIBRARY_DB_PATH)
+
+def get_lyrics_conn():
+    """Returns WAL connection to the Dedicated Lyrics/Subtitles database (lyrics.db)."""
+    return _create_wal_connection(LYRICS_DB_PATH)
 
 def init_db():
     try:
@@ -89,8 +94,16 @@ def init_db():
                 )
             """)
 
-            # Cached synchronized and plain lyrics for offline 0ms instant loading
-            c.execute("""
+            # High-speed indexes for instantaneous lookup
+            c.execute("CREATE INDEX IF NOT EXISTS idx_cached_charts_genre ON cached_charts(genre);")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_cached_albums_id ON cached_albums(id);")
+            c.execute("CREATE INDEX IF NOT EXISTS idx_mb_cache_key ON musicbrainz_cache(cache_key);")
+            conn.commit()
+
+        # 2. Initialize lyrics.db (Dedicated lyrics & synchronized subtitles cache)
+        with get_lyrics_conn() as lyr_conn:
+            lyrc = lyr_conn.cursor()
+            lyrc.execute("""
                 CREATE TABLE IF NOT EXISTS cached_lyrics (
                     cache_key TEXT PRIMARY KEY,
                     artist TEXT NOT NULL,
@@ -101,16 +114,11 @@ def init_db():
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            lyrc.execute("CREATE INDEX IF NOT EXISTS idx_cached_lyrics_key ON cached_lyrics(cache_key);")
+            lyrc.execute("CREATE INDEX IF NOT EXISTS idx_cached_lyrics_art_tit ON cached_lyrics(artist, title);")
+            lyr_conn.commit()
 
-            # High-speed indexes for instantaneous lookup
-            c.execute("CREATE INDEX IF NOT EXISTS idx_cached_charts_genre ON cached_charts(genre);")
-            c.execute("CREATE INDEX IF NOT EXISTS idx_cached_albums_id ON cached_albums(id);")
-            c.execute("CREATE INDEX IF NOT EXISTS idx_mb_cache_key ON musicbrainz_cache(cache_key);")
-            c.execute("CREATE INDEX IF NOT EXISTS idx_cached_lyrics_key ON cached_lyrics(cache_key);")
-            c.execute("CREATE INDEX IF NOT EXISTS idx_cached_lyrics_art_tit ON cached_lyrics(artist, title);")
-            conn.commit()
-
-        # 2. Initialize music_library.db (Personal physical music collection index)
+        # 3. Initialize music_library.db (Personal physical music collection index)
         with get_library_conn() as lib_conn:
             lc = lib_conn.cursor()
 
@@ -154,27 +162,31 @@ def init_db():
             lc.execute("CREATE INDEX IF NOT EXISTS idx_dl_art_alb ON downloaded_albums(artist, title);")
             lib_conn.commit()
 
-        # 3. One-time seamless migration of existing download history from discovery.db to music_library.db
+        # 4. Seamless migration of lyrics subtitles from discovery.db to lyrics.db, then vacuum discovery.db
         try:
-            with get_conn() as disc_conn, get_library_conn() as lib_conn:
+            with get_conn() as disc_conn, get_lyrics_conn() as lyr_conn:
                 d_cur = disc_conn.cursor()
-                l_cur = lib_conn.cursor()
-                d_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='downloaded_albums'")
+                l_cur = lyr_conn.cursor()
+                d_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='cached_lyrics'")
                 if d_cur.fetchone():
-                    d_cur.execute("SELECT id, title, artist, artist_id, year, cover_url, track_count, dest_path, downloaded_at FROM downloaded_albums")
+                    d_cur.execute("SELECT cache_key, artist, title, synced_lyrics, plain_lyrics, instrumental, updated_at FROM cached_lyrics")
                     rows = d_cur.fetchall()
                     if rows:
                         for r in rows:
                             l_cur.execute("""
-                                INSERT OR IGNORE INTO downloaded_albums 
-                                (id, title, artist, artist_id, year, cover_url, track_count, dest_path, downloaded_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            """, (r["id"], r["title"], r["artist"], r["artist_id"], r["year"], r["cover_url"], r["track_count"], r["dest_path"], r["downloaded_at"]))
-                        lib_conn.commit()
+                                INSERT OR IGNORE INTO cached_lyrics
+                                (cache_key, artist, title, synced_lyrics, plain_lyrics, instrumental, updated_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """, (r["cache_key"], r["artist"], r["title"], r["synced_lyrics"], r["plain_lyrics"], r["instrumental"], r["updated_at"]))
+                        lyr_conn.commit()
+                    d_cur.execute("DROP TABLE cached_lyrics")
+                    disc_conn.commit()
+                    disc_conn.execute("VACUUM")
+                    log_info("[DB] Migrated lyrics subtitles to lyrics.db and vacuumed discovery.db.")
         except Exception:
             pass
 
-        log_info("[DB] Dual SQLite databases initialized (discovery.db + music_library.db) in WAL mode.")
+        log_info("[DB] Multi-database architecture active (discovery.db + music_library.db + lyrics.db) in WAL mode.")
     except Exception as e:
         log_error(f"[DB INIT ERROR] {e}")
 
@@ -418,13 +430,13 @@ def save_cached_musicbrainz(cache_key: str, data: dict):
 
 
 def get_cached_lyrics(artist: str, title: str) -> dict:
-    """Retrieve cached lyrics from SQLite by normalized artist and title."""
+    """Retrieve cached lyrics from dedicated lyrics.db by normalized artist and title."""
     import re
     clean_art = re.sub(r"\(.*?\)|\[.*?\]", "", artist).strip().lower()
     clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", title).strip().lower()
     cache_key = f"{clean_art}:::{clean_tit}"
     try:
-        with get_conn() as conn:
+        with get_lyrics_conn() as conn:
             c = conn.cursor()
             c.execute(
                 "SELECT synced_lyrics, plain_lyrics, instrumental FROM cached_lyrics WHERE cache_key = ?",
@@ -443,7 +455,7 @@ def get_cached_lyrics(artist: str, title: str) -> dict:
 
 
 def save_cached_lyrics(artist: str, title: str, lyrics_data: dict):
-    """Save synchronized lyrics to SQLite so subsequent plays load offline in 0ms."""
+    """Save synchronized lyrics to dedicated lyrics.db so subsequent plays load offline in 0ms."""
     if not lyrics_data or not (lyrics_data.get("synced") or lyrics_data.get("plain")):
         return
     import re
@@ -451,7 +463,7 @@ def save_cached_lyrics(artist: str, title: str, lyrics_data: dict):
     clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", title).strip().lower()
     cache_key = f"{clean_art}:::{clean_tit}"
     try:
-        with get_conn() as conn:
+        with get_lyrics_conn() as conn:
             c = conn.cursor()
             c.execute("""
                 INSERT OR REPLACE INTO cached_lyrics (cache_key, artist, title, synced_lyrics, plain_lyrics, instrumental, updated_at)

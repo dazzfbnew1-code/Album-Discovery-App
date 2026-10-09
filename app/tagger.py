@@ -13,9 +13,10 @@ def tag_mp3_file(
     total_tracks: int = 1,
     year: str = "",
     genre: str = "Music",
-    cover_path: str = ""
+    cover_path: str = "",
+    lyrics: str = ""
 ) -> bool:
-    """Embed comprehensive ID3 tags (Title, Artist, Album, Year, Track, Genre, Art)."""
+    """Embed comprehensive ID3 tags (Title, Artist, Album, Year, Track, Genre, Art, Lyrics)."""
     try:
         from mutagen.id3 import (
             APIC,
@@ -26,6 +27,7 @@ def tag_mp3_file(
             TIT2,
             TPE1,
             TRCK,
+            USLT,
             ID3NoHeaderError
         )
 
@@ -54,6 +56,8 @@ def tag_mp3_file(
             audio["TDRC"] = TDRC(encoding=3, text=str(year))
         if genre:
             audio["TCON"] = TCON(encoding=3, text=genre)
+        if lyrics:
+            audio["USLT::eng"] = USLT(encoding=3, lang="eng", desc="", text=lyrics)
 
         # Embed front album art if cover.jpg exists
         if cover_path and Path(cover_path).exists():
