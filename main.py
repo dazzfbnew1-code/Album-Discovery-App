@@ -7,6 +7,9 @@ import sys
 import threading
 import time
 
+# Prevent Python bytecode clutter in project directories
+sys.dont_write_bytecode = True
+
 # Explicitly register Windows Taskbar AppUserModelID for custom icon grouping
 try:
     myappid = "dazz.albumdiscovery.station.1.0"

@@ -43,7 +43,24 @@ if ($desktop -and (Test-Path $desktop)) {
 
 Write-Host "[SUCCESS] Created App Folder Shortcut at: $localShortcut" -ForegroundColor Green
 
-# 3. Notify Windows Shell to refresh icon cache immediately
+# 3. Configure Custom Folder Icon in Windows Explorer
+$iniPath = Join-Path $appDir "desktop.ini"
+if (Test-Path $iconFile) {
+    try {
+        if (Test-Path $iniPath) {
+            attrib -h -s $iniPath
+        }
+        $iniText = "[.ShellClassInfo]`r`nIconResource=" + $iconFile + ",0`r`n[ViewState]`r`nMode=`r`nVid=`r`nFolderType=Generic`r`n"
+        [System.IO.File]::WriteAllText($iniPath, $iniText, [System.Text.Encoding]::Unicode)
+        attrib +h +s $iniPath
+        attrib +r $appDir
+        Write-Host "[SUCCESS] Configured Folder Custom Icon: $iconFile" -ForegroundColor Green
+    } catch {
+        Write-Host "[WARN] Could not set folder desktop.ini: $_" -ForegroundColor Yellow
+    }
+}
+
+# 4. Notify Windows Shell to refresh icon cache immediately
 try {
     $code = @'
     using System;
