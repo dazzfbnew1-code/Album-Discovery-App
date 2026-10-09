@@ -4,6 +4,7 @@ import re
 import time
 import urllib.parse
 import urllib.request
+from typing import Optional, Union
 
 from .config import CONFIG
 from .overrides import get_deezer_genre_map, get_junk_patterns
@@ -47,17 +48,21 @@ def is_junk_title(title: str, artist_name: str = "") -> bool:
     return False
 
 
-def fetch_json(url: str, timeout: int = 6, retries: int = 2):
+def fetch_json(url: str, timeout: Union[int, float] = 6, retries: int = 2, headers: Optional[dict] = None):
     """Fetch and decode JSON from a remote URL with retry backoff."""
+    req_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        )
+    }
+    if headers:
+        req_headers.update(headers)
+
     req = urllib.request.Request(
         url,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            )
-        }
+        headers=req_headers
     )
 
     for attempt in range(retries + 1):
