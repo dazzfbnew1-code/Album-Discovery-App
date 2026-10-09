@@ -268,13 +268,15 @@ def get_genre_charts(genre: str = "all", limit: int = 100, force_refresh: bool =
         if chart_data and isinstance(chart_data, dict) and "data" in chart_data:
             raw_list.extend(chart_data["data"])
             
-        track_chart = fetch_json(f"https://api.deezer.com/chart/{gid}/tracks?limit=100", timeout=4)
-        if track_chart and isinstance(track_chart, dict) and "data" in track_chart:
-            for t in track_chart["data"]:
-                alb = t.get("album")
-                if alb:
-                    alb["artist"] = t.get("artist") or alb.get("artist")
-                    raw_list.append(alb)
+        # For singles chart, pull top tracks. For albums, keep strictly to albums chart
+        if genre_clean in ["top_singles", "singles", "top100_singles"]:
+            track_chart = fetch_json(f"https://api.deezer.com/chart/{gid}/tracks?limit=100", timeout=4)
+            if track_chart and isinstance(track_chart, dict) and "data" in track_chart:
+                for t in track_chart["data"]:
+                    alb = t.get("album")
+                    if alb:
+                        alb["artist"] = t.get("artist") or alb.get("artist")
+                        raw_list.append(alb)
 
         # Multi-search across rich subgenre queries for 1,000+ deep pool
         sub_kws = GENRE_SUBQUERIES.get(genre_clean, [f"{genre_clean} albums", f"best {genre_clean}", f"classic {genre_clean}"])
@@ -335,6 +337,15 @@ def get_genre_charts(genre: str = "all", limit: int = 100, force_refresh: bool =
         artist = item.get("artist", {}).get("name") or ""
         if is_junk_title(title, artist):
             return None
+
+        # Filter out standalone singles and remix EPs from Studio Album charts
+        if genre_clean not in ["top_singles", "singles", "top100_singles"]:
+            rec_type = str(item.get("record_type") or "").lower()
+            if rec_type in ["single", "ep"]:
+                return None
+            t_low = title.lower()
+            if t_low.endswith(" - single") or t_low.endswith(" (single)") or " - the remixes" in t_low:
+                return None
 
         local_cached = get_cached_album(alb_id)
         raw_date = item.get("release_date") or (local_cached.get("release_date") if local_cached else "") or ""
