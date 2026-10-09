@@ -106,16 +106,19 @@ def get_system_stats() -> dict:
     except Exception:
         pass
 
-    # Subsystems: Database
+    # Subsystems: Database (Dual Databases: discovery.db + music_library.db)
     db_size_str = "0 KB"
+    lib_db_size_str = "0 KB"
     try:
-        db_path = Path(__file__).resolve().parent.parent / "data" / "discovery.db"
+        data_dir = Path(__file__).resolve().parent.parent / "data"
+        db_path = data_dir / "discovery.db"
+        lib_path = data_dir / "music_library.db"
         if db_path.exists():
             sz = db_path.stat().st_size
-            if sz >= 1024 * 1024:
-                db_size_str = f"{round(sz / (1024 * 1024), 1)} MB"
-            else:
-                db_size_str = f"{round(sz / 1024, 1)} KB"
+            db_size_str = f"{round(sz / (1024 * 1024), 1)} MB" if sz >= 1024 * 1024 else f"{round(sz / 1024, 1)} KB"
+        if lib_path.exists():
+            lsz = lib_path.stat().st_size
+            lib_db_size_str = f"{round(lsz / (1024 * 1024), 1)} MB" if lsz >= 1024 * 1024 else f"{round(lsz / 1024, 1)} KB"
     except Exception:
         pass
 
@@ -152,8 +155,10 @@ def get_system_stats() -> dict:
             "music_root": str(CONFIG.get("music_root", ""))
         },
         "database": {
-            "size_str": db_size_str,
-            "name": "discovery.db"
+            "size_str": f"{db_size_str} App • {lib_db_size_str} Lib" if lib_db_size_str != "0 KB" else db_size_str,
+            "name": "discovery.db + music_library.db",
+            "app_size": db_size_str,
+            "library_size": lib_db_size_str
         },
         "recent_events": get_recent_events(30)
     }

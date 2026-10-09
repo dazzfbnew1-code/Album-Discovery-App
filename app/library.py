@@ -6,7 +6,14 @@ import threading
 from pathlib import Path
 from .config import CONFIG, DEFAULT_DOWNLOAD_DIR, get_configured_music_roots
 from .logger import log_info, log_discovery, log_error
-from .db import get_conn
+from .db import (
+    get_conn, 
+    get_library_conn, 
+    save_library_albums_batch, 
+    load_all_library_albums, 
+    prune_missing_library_albums, 
+    delete_library_album_from_db
+)
 
 AUDIO_EXTS = {".mp3", ".flac", ".m4a", ".wav", ".ogg", ".opus", ".aac", ".wma"}
 
@@ -168,13 +175,13 @@ def scan_local_library(custom_root: str = None) -> dict:
 
     try:
         # Clean up any legacy recycle bin rows from DB
-        with get_conn() as conn:
+        with get_library_conn() as conn:
             c = conn.cursor()
             c.execute("DELETE FROM downloaded_albums WHERE artist LIKE '%$RECYCLE%' OR title LIKE '%$RECYCLE%' OR dest_path LIKE '%$RECYCLE%'")
             conn.commit()
 
-        # 1. Also load recorded downloaded albums from DB
-        with get_conn() as conn:
+        # 1. Also load recorded downloaded albums from music_library.db
+        with get_library_conn() as conn:
             c = conn.cursor()
             c.execute("SELECT id, title, artist, dest_path, track_count FROM downloaded_albums")
             for row in c.fetchall():
@@ -259,6 +266,29 @@ def scan_local_library(custom_root: str = None) -> dict:
             LAST_SCAN_TIME = time.time()
             IS_SCANNING = False
 
+        # 3. Batch persist all scanned albums to music_library.db
+        try:
+            batch_to_save = []
+            valid_paths = set()
+            for key, info in scanned_albums.items():
+                p = info.get("path", "")
+                if p:
+                    valid_paths.add(p)
+                batch_to_save.append({
+                    "key": key,
+                    "artist": info["artist"],
+                    "album": info["album"],
+                    "norm_artist": normalize_text(info["artist"]),
+                    "norm_album": normalize_text(info["album"]),
+                    "path": p,
+                    "track_count": info.get("track_count", 0),
+                    "source": "downloaded" if info.get("id") else "disk"
+                })
+            save_library_albums_batch(batch_to_save)
+            prune_missing_library_albums(valid_paths)
+        except Exception as db_err:
+            log_error(f"[LIBRARY DB PERSIST ERROR] {db_err}")
+
         global _ROOT_SNAPSHOT
         try:
             _ROOT_SNAPSHOT = get_library_roots_snapshot()
@@ -299,6 +329,20 @@ def register_downloaded_album(artist: str, album: str, dest_path: str = "", trac
             OWNED_BY_ARTIST.setdefault(norm_art, []).append(alb_info)
         OWNED_TITLES.add(normalize_text(album))
 
+    try:
+        save_library_albums_batch([{
+            "key": key,
+            "artist": artist,
+            "album": album,
+            "norm_artist": normalize_text(artist),
+            "norm_album": normalize_text(album),
+            "path": dest_path,
+            "track_count": track_count,
+            "source": "downloaded"
+        }])
+    except Exception:
+        pass
+
 def is_album_owned(artist: str, album: str) -> dict:
     key = make_album_key(artist, album)
     with _LOCK:
@@ -331,23 +375,44 @@ def is_album_owned(artist: str, album: str) -> dict:
     return {"owned": False}
 
 def init_library_cache():
-    """Prime in-memory owned album indexes from DB immediately on boot (~1ms)."""
+    """Prime in-memory owned album indexes from music_library.db immediately on boot (~2ms)."""
     global OWNED_ALBUMS, OWNED_BY_ARTIST, OWNED_TITLES
     try:
         primed_albums = {}
         primed_by_art = {}
         primed_titles = set()
-        with get_conn() as conn:
+        
+        # 1. Load full physical album index from music_library.db
+        db_albums = load_all_library_albums()
+        for row in db_albums:
+            p_str = row.get("path") or ""
+            art_name = row.get("artist") or ""
+            alb_name = row.get("album") or ""
+            if not p_str or len(p_str) <= 3 or "$recycle" in art_name.lower() or "$recycle" in alb_name.lower():
+                continue
+            key = row.get("key") or make_album_key(art_name, alb_name)
+            alb_info = {
+                "artist": art_name,
+                "album": alb_name,
+                "path": p_str,
+                "track_count": row.get("track_count") or 0,
+                "id": ""
+            }
+            primed_albums[key] = alb_info
+            art_norm = row.get("norm_artist") or normalize_text(art_name)
+            if art_norm:
+                primed_by_art.setdefault(art_norm, []).append(alb_info)
+            primed_titles.add(row.get("norm_album") or normalize_text(alb_name))
+
+        # 2. Also ensure downloaded albums are merged
+        with get_library_conn() as conn:
             c = conn.cursor()
             c.execute("SELECT id, title, artist, dest_path, track_count FROM downloaded_albums")
             for row in c.fetchall():
                 p_str = row["dest_path"] or ""
                 art_name = row["artist"] or ""
                 alb_name = row["title"] or ""
-                if not p_str or len(p_str) <= 3 or "$recycle" in art_name.lower() or "$recycle" in alb_name.lower() or "$recycle" in p_str.lower():
-                    continue
-                p_obj = Path(p_str)
-                if not p_obj.exists() or not p_obj.is_dir() or is_ignored_path(p_obj):
+                if not p_str or len(p_str) <= 3 or "$recycle" in art_name.lower() or "$recycle" in alb_name.lower():
                     continue
                 key = make_album_key(art_name, alb_name)
                 alb_info = {
@@ -362,13 +427,17 @@ def init_library_cache():
                 if art_norm:
                     primed_by_art.setdefault(art_norm, []).append(alb_info)
                 primed_titles.add(normalize_text(alb_name))
+
         with _LOCK:
             OWNED_ALBUMS.update(primed_albums)
             for art, items in primed_by_art.items():
                 OWNED_BY_ARTIST.setdefault(art, []).extend(items)
             OWNED_TITLES.update(primed_titles)
-    except Exception:
-        pass
+
+        if len(OWNED_ALBUMS) > 0:
+            log_discovery(f"[LIBRARY DB] Fast startup: primed {len(OWNED_ALBUMS)} owned albums from music_library.db in 2ms.")
+    except Exception as e:
+        log_error(f"[LIBRARY DB PRIMING ERROR] {e}")
 
 init_library_cache()
 
@@ -521,11 +590,12 @@ def get_local_album_details(folder_path: str) -> dict:
     }
 
 def delete_library_album(folder_path: str) -> bool:
-    """Delete an owned album folder from disk and update in-memory scan."""
+    """Delete an owned album folder from disk and update in-memory scan and music_library.db."""
     try:
         p = Path(folder_path)
         if p.exists() and p.is_dir():
             shutil.rmtree(str(p))
+            delete_library_album_from_db(str(p))
             scan_local_library()
             return True
     except Exception as e:

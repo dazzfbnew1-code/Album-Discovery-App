@@ -5,10 +5,12 @@ from .logger import log_info, log_error
 
 DB_DIR = Path(__file__).resolve().parent.parent / "data"
 DB_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DB_DIR / "discovery.db"
+DISCOVERY_DB_PATH = DB_DIR / "discovery.db"
+LIBRARY_DB_PATH = DB_DIR / "music_library.db"
+DB_PATH = DISCOVERY_DB_PATH
 
-def get_conn():
-    conn = sqlite3.connect(str(DB_PATH), timeout=15)
+def _create_wal_connection(db_file: Path):
+    conn = sqlite3.connect(str(db_file), timeout=15)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA journal_mode = WAL;")
@@ -20,25 +22,19 @@ def get_conn():
         pass
     return conn
 
+def get_conn():
+    """Returns WAL connection to the Discovery & App operational database (discovery.db)."""
+    return _create_wal_connection(DISCOVERY_DB_PATH)
+
+def get_library_conn():
+    """Returns WAL connection to the Personal Music Library database (music_library.db)."""
+    return _create_wal_connection(LIBRARY_DB_PATH)
+
 def init_db():
     try:
+        # 1. Initialize discovery.db (App operational cache, charts, lyrics, favorites, queue)
         with get_conn() as conn:
             c = conn.cursor()
-            
-            # Downloaded albums history
-            c.execute("""
-                CREATE TABLE IF NOT EXISTS downloaded_albums (
-                    id TEXT PRIMARY KEY,
-                    title TEXT NOT NULL,
-                    artist TEXT NOT NULL,
-                    artist_id TEXT,
-                    year TEXT,
-                    cover_url TEXT,
-                    track_count INTEGER DEFAULT 0,
-                    dest_path TEXT,
-                    downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
             
             # Cached album metadata
             c.execute("""
@@ -109,14 +105,76 @@ def init_db():
             # High-speed indexes for instantaneous lookup
             c.execute("CREATE INDEX IF NOT EXISTS idx_cached_charts_genre ON cached_charts(genre);")
             c.execute("CREATE INDEX IF NOT EXISTS idx_cached_albums_id ON cached_albums(id);")
-            c.execute("CREATE INDEX IF NOT EXISTS idx_downloaded_albums_id ON downloaded_albums(id);")
-            c.execute("CREATE INDEX IF NOT EXISTS idx_downloaded_albums_art_alb ON downloaded_albums(artist, title);")
             c.execute("CREATE INDEX IF NOT EXISTS idx_mb_cache_key ON musicbrainz_cache(cache_key);")
             c.execute("CREATE INDEX IF NOT EXISTS idx_cached_lyrics_key ON cached_lyrics(cache_key);")
             c.execute("CREATE INDEX IF NOT EXISTS idx_cached_lyrics_art_tit ON cached_lyrics(artist, title);")
-
             conn.commit()
-            log_info("[DB] SQLite database initialized with WAL mode and performance indexes.")
+
+        # 2. Initialize music_library.db (Personal physical music collection index)
+        with get_library_conn() as lib_conn:
+            lc = lib_conn.cursor()
+
+            # Physical indexed albums from disk
+            lc.execute("""
+                CREATE TABLE IF NOT EXISTS library_albums (
+                    key TEXT PRIMARY KEY,
+                    artist TEXT NOT NULL,
+                    album TEXT NOT NULL,
+                    norm_artist TEXT,
+                    norm_album TEXT,
+                    path TEXT NOT NULL,
+                    track_count INTEGER DEFAULT 0,
+                    year TEXT,
+                    cover_path TEXT,
+                    source TEXT DEFAULT 'disk',
+                    mtime REAL DEFAULT 0,
+                    indexed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # Recorded downloaded albums
+            lc.execute("""
+                CREATE TABLE IF NOT EXISTS downloaded_albums (
+                    id TEXT PRIMARY KEY,
+                    title TEXT NOT NULL,
+                    artist TEXT NOT NULL,
+                    artist_id TEXT,
+                    year TEXT,
+                    cover_url TEXT,
+                    track_count INTEGER DEFAULT 0,
+                    dest_path TEXT,
+                    downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            lc.execute("CREATE INDEX IF NOT EXISTS idx_lib_norm_artist ON library_albums(norm_artist);")
+            lc.execute("CREATE INDEX IF NOT EXISTS idx_lib_path ON library_albums(path);")
+            lc.execute("CREATE INDEX IF NOT EXISTS idx_dl_id ON downloaded_albums(id);")
+            lc.execute("CREATE INDEX IF NOT EXISTS idx_dl_art_alb ON downloaded_albums(artist, title);")
+            lib_conn.commit()
+
+        # 3. One-time seamless migration of existing download history from discovery.db to music_library.db
+        try:
+            with get_conn() as disc_conn, get_library_conn() as lib_conn:
+                d_cur = disc_conn.cursor()
+                l_cur = lib_conn.cursor()
+                d_cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='downloaded_albums'")
+                if d_cur.fetchone():
+                    d_cur.execute("SELECT id, title, artist, artist_id, year, cover_url, track_count, dest_path, downloaded_at FROM downloaded_albums")
+                    rows = d_cur.fetchall()
+                    if rows:
+                        for r in rows:
+                            l_cur.execute("""
+                                INSERT OR IGNORE INTO downloaded_albums 
+                                (id, title, artist, artist_id, year, cover_url, track_count, dest_path, downloaded_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (r["id"], r["title"], r["artist"], r["artist_id"], r["year"], r["cover_url"], r["track_count"], r["dest_path"], r["downloaded_at"]))
+                        lib_conn.commit()
+        except Exception:
+            pass
+
+        log_info("[DB] Dual SQLite databases initialized (discovery.db + music_library.db) in WAL mode.")
     except Exception as e:
         log_error(f"[DB INIT ERROR] {e}")
 
@@ -125,7 +183,7 @@ init_db()
 
 def record_download(album: dict, dest_path: str = ""):
     try:
-        with get_conn() as conn:
+        with get_library_conn() as conn:
             c = conn.cursor()
             c.execute("""
                 INSERT OR REPLACE INTO downloaded_albums 
@@ -142,13 +200,13 @@ def record_download(album: dict, dest_path: str = ""):
                 str(dest_path)
             ))
             conn.commit()
-            log_info(f"[DB] Recorded download for album: {album.get('title')} by {album.get('artist')}")
+            log_info(f"[DB] Recorded download in music_library.db: {album.get('title')} by {album.get('artist')}")
     except Exception as e:
         log_error(f"[DB ERROR] record_download failed: {e}")
 
 def get_downloaded_ids() -> list:
     try:
-        with get_conn() as conn:
+        with get_library_conn() as conn:
             c = conn.cursor()
             c.execute("SELECT id FROM downloaded_albums")
             return [str(row["id"]) for row in c.fetchall()]
@@ -158,7 +216,7 @@ def get_downloaded_ids() -> list:
 
 def get_downloads_history(limit: int = 50) -> list:
     try:
-        with get_conn() as conn:
+        with get_library_conn() as conn:
             c = conn.cursor()
             c.execute("SELECT * FROM downloaded_albums ORDER BY downloaded_at DESC LIMIT ?", (limit,))
             return [dict(row) for row in c.fetchall()]
@@ -412,14 +470,92 @@ def save_cached_lyrics(artist: str, title: str, lyrics_data: dict):
 
 
 def clear_downloads_history():
-    """Clear all downloaded albums history records from SQLite."""
+    """Clear all downloaded albums history records from music_library.db."""
     try:
-        with get_conn() as conn:
+        with get_library_conn() as conn:
             c = conn.cursor()
             c.execute("DELETE FROM downloaded_albums")
             conn.commit()
-            log_info("[DB] Cleared downloaded_albums history.")
+            log_info("[DB] Cleared downloaded_albums history in music_library.db.")
     except Exception as e:
         log_error(f"[DB ERROR] clear_downloads_history failed: {e}")
+
+def save_library_albums_batch(albums_list: list):
+    """Batch upsert scanned local albums into music_library.db."""
+    if not albums_list:
+        return
+    try:
+        with get_library_conn() as conn:
+            c = conn.cursor()
+            for alb in albums_list:
+                key = alb.get("key") or f"{alb.get('artist', '')}:::{alb.get('album', '')}"
+                c.execute("""
+                    INSERT INTO library_albums
+                    (key, artist, album, norm_artist, norm_album, path, track_count, year, cover_path, source, mtime, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+                    ON CONFLICT(key) DO UPDATE SET
+                        path = excluded.path,
+                        track_count = excluded.track_count,
+                        mtime = excluded.mtime,
+                        cover_path = COALESCE(excluded.cover_path, library_albums.cover_path),
+                        updated_at = datetime('now', 'localtime')
+                """, (
+                    key,
+                    alb.get("artist", ""),
+                    alb.get("album", ""),
+                    alb.get("norm_artist", ""),
+                    alb.get("norm_album", ""),
+                    alb.get("path", ""),
+                    int(alb.get("track_count") or 0),
+                    str(alb.get("year") or ""),
+                    alb.get("cover_path") or "",
+                    alb.get("source") or "disk",
+                    float(alb.get("mtime") or 0.0)
+                ))
+            conn.commit()
+    except Exception as e:
+        log_error(f"[DB ERROR] save_library_albums_batch failed: {e}")
+
+def load_all_library_albums() -> list:
+    """Instant load of all indexed albums from music_library.db (~2ms)."""
+    try:
+        with get_library_conn() as conn:
+            c = conn.cursor()
+            c.execute("SELECT key, artist, album, norm_artist, norm_album, path, track_count, year, cover_path, source, mtime FROM library_albums")
+            return [dict(row) for row in c.fetchall()]
+    except Exception as e:
+        log_error(f"[DB ERROR] load_all_library_albums failed: {e}")
+        return []
+
+def prune_missing_library_albums(valid_paths: set):
+    """Remove albums from music_library.db if their folder was deleted from disk."""
+    if not valid_paths:
+        return
+    try:
+        with get_library_conn() as conn:
+            c = conn.cursor()
+            c.execute("SELECT key, path FROM library_albums")
+            to_delete = []
+            for row in c.fetchall():
+                p = row["path"]
+                if p and p not in valid_paths:
+                    to_delete.append(row["key"])
+            if to_delete:
+                c.executemany("DELETE FROM library_albums WHERE key = ?", [(k,) for k in to_delete])
+                conn.commit()
+                log_info(f"[DB] Pruned {len(to_delete)} deleted albums from music_library.db")
+    except Exception as e:
+        log_error(f"[DB ERROR] prune_missing_library_albums failed: {e}")
+
+def delete_library_album_from_db(folder_path: str):
+    """Delete an album entry from music_library.db when deleted by user."""
+    try:
+        with get_library_conn() as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM library_albums WHERE path = ?", (str(folder_path),))
+            c.execute("DELETE FROM downloaded_albums WHERE dest_path = ?", (str(folder_path),))
+            conn.commit()
+    except Exception as e:
+        log_error(f"[DB ERROR] delete_library_album_from_db failed: {e}")
 
 
