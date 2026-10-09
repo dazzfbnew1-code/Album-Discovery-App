@@ -4907,6 +4907,74 @@ body:has(#inspectDrawer:not(.hidden)) .player-dock-pill {
   white-space: nowrap;
 }
 
+/* Database Subsystem Telemetry List */
+.mon-db-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.mon-db-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm, 6px);
+  transition: all 0.15s ease;
+}
+
+.mon-db-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.mon-db-info {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.mon-db-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mon-db-dot.blue {
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.55);
+}
+
+.mon-db-dot.emerald {
+  background: #34d399;
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.55);
+}
+
+.mon-db-dot.violet {
+  background: #a78bfa;
+  box-shadow: 0 0 6px rgba(167, 139, 250, 0.55);
+}
+
+.mon-db-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #e2e8f0;
+  letter-spacing: -0.1px;
+}
+
+.mon-db-size {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  color: #94a3b8;
+  letter-spacing: -0.2px;
+}
+
 /* Event Log Terminal Window */
 .mon-console-hdr {
   display: flex;

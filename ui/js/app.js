@@ -162,6 +162,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const monLibPath = document.getElementById("monLibPath");
   const monDbName = document.getElementById("monDbName");
   const monDbSize = document.getElementById("monDbSize");
+  const monDbDiscoverySize = document.getElementById("monDbDiscoverySize");
+  const monDbLibrarySize = document.getElementById("monDbLibrarySize");
+  const monDbLyricsSize = document.getElementById("monDbLyricsSize");
   const monLogConsole = document.getElementById("monLogConsole");
   const btnMonClearConsole = document.getElementById("btnMonClearConsole");
 
@@ -4189,6 +4192,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const db = data.database || {};
     if (monDbName) monDbName.textContent = db.name || "discovery.db";
     if (monDbSize) monDbSize.textContent = db.size_str || `${db.size_kb || 0} KB`;
+    if (monDbDiscoverySize) monDbDiscoverySize.textContent = db.app_size || "0 KB";
+    if (monDbLibrarySize) monDbLibrarySize.textContent = db.library_size || "0 KB";
+    if (monDbLyricsSize) monDbLyricsSize.textContent = db.lyrics_size || "0 KB";
 
     // Live Activity Stream
     if (monLogConsole) {
