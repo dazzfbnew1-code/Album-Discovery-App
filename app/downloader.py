@@ -142,6 +142,7 @@ class DownloadManager:
         self.queue = load_persisted_queue()
         self.active_job = None
         self.history = []
+        self.cookie_notice = None
         self._lock = threading.RLock()
         self._worker_thread = threading.Thread(target=self._process_queue, daemon=True, name="DownloadManagerWorker")
         self._running = True
@@ -274,7 +275,8 @@ class DownloadManager:
             return {
                 "active": active_copy,
                 "queue": [dict(j) for j in self.queue],
-                "history": [dict(j) for j in self.history[-15:]]
+                "history": [dict(j) for j in self.history[-15:]],
+                "cookie_notice": self.cookie_notice
             }
 
     def _process_queue(self):
@@ -870,6 +872,8 @@ class DownloadManager:
         if not safe_out.exists() or safe_out.stat().st_size < 50000:
             _cleanup_partial_artifacts()
             err_msg = str(last_err) if last_err else "No playable audio stream or candidates resolved across primary and fallback searches"
+            if any(k in err_msg.lower() for k in ["bot", "cookies", "sign in", "confirm you're not a bot", "permission denied", "errno 13"]):
+                self.cookie_notice = "YouTube requires a browser check. If using Microsoft Edge, please close Edge for 5 seconds and click 'Refresh Connection'!"
             raise RuntimeError(f"Could not download audio track '{title}': {err_msg}")
 
     def _tag_audio_file(self, file_path: str, title: str, artist: str, album: str, track_no: int, total_tracks: int, year: str, cover_path: str = None, ext: str = "mp3", lyrics: str = ""):
@@ -936,3 +940,67 @@ class DownloadManager:
             log_warn(f"Tagging error for {file_path}: {e}")
 
 DOWNLOAD_MANAGER = DownloadManager()
+
+def sync_browser_cookies() -> dict:
+    """Safely extracts fresh YouTube verification cookies from Firefox or Microsoft Edge into data/cookies.txt."""
+    import psutil
+    cookies_path = Path(__file__).parent.parent / "data" / "cookies.txt"
+
+    # 1. Try Firefox first (instant zero-lock extraction if installed)
+    try:
+        ydl_opts_ff = {
+            "cookiesfrombrowser": ("firefox",),
+            "cookiefile": str(cookies_path),
+            "quiet": True,
+            "skip_download": True
+        }
+        with yt_dlp.YoutubeDL(ydl_opts_ff) as ydl:
+            ydl.extract_info("https://www.youtube.com/watch?v=45cYwDMibGo", download=False)
+        DOWNLOAD_MANAGER.cookie_notice = None
+        log_download("[COOKIES SYNC] Successfully updated YouTube cookies from Firefox.")
+        return {
+            "status": "success",
+            "browser": "Firefox",
+            "message": "YouTube connection verified and updated from Firefox!"
+        }
+    except Exception:
+        pass
+
+    # 2. Check if Microsoft Edge is running and locking its database
+    is_edge_open = False
+    try:
+        is_edge_open = any("msedge" in (p.info["name"] or "").lower() for p in psutil.process_iter(["name"]))
+    except Exception:
+        pass
+
+    if is_edge_open:
+        return {
+            "status": "edge_open",
+            "browser": "Edge",
+            "message": "Microsoft Edge is currently open. Please close Microsoft Edge for 5 seconds and click Sync again!"
+        }
+
+    # 3. Extract from Microsoft Edge (now that Edge is closed)
+    try:
+        ydl_opts_edge = {
+            "cookiesfrombrowser": ("edge",),
+            "cookiefile": str(cookies_path),
+            "quiet": True,
+            "skip_download": True
+        }
+        with yt_dlp.YoutubeDL(ydl_opts_edge) as ydl:
+            ydl.extract_info("https://www.youtube.com/watch?v=45cYwDMibGo", download=False)
+        DOWNLOAD_MANAGER.cookie_notice = None
+        log_download("[COOKIES SYNC] Successfully updated YouTube cookies from Microsoft Edge.")
+        return {
+            "status": "success",
+            "browser": "Edge",
+            "message": "YouTube connection verified and updated from Microsoft Edge! You can reopen Edge now."
+        }
+    except Exception as e:
+        log_error(f"[COOKIES SYNC ERROR] {e}")
+        return {
+            "status": "error",
+            "browser": "Edge",
+            "message": f"Could not sync from Edge: {e}"
+        }

@@ -251,6 +251,18 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
         elif route in ["download/status", "download/queue"]:
             self._send_json(DOWNLOAD_MANAGER.get_status())
 
+        elif route == "cookies/sync":
+            from .downloader import sync_browser_cookies
+            self._send_json(sync_browser_cookies())
+
+        elif route == "cookies/status":
+            cookies_file = Path(__file__).parent.parent / "data" / "cookies.txt"
+            has_cookies = cookies_file.exists() and cookies_file.stat().st_size > 100
+            self._send_json({
+                "has_cookies": has_cookies,
+                "cookie_notice": DOWNLOAD_MANAGER.cookie_notice
+            })
+
         elif route == "monitor/stats":
             self._send_json(get_system_stats())
 
@@ -590,6 +602,10 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
                 "drives": drives_data,
                 "download_root": updated_def
             })
+
+        elif route == "cookies/sync":
+            from .downloader import sync_browser_cookies
+            self._send_json(sync_browser_cookies())
 
         else:
             self._send_json({"error": "Unknown POST endpoint"}, 404)

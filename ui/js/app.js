@@ -213,6 +213,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnClearActiveQueue = document.getElementById("btnClearActiveQueue");
   const toastContainer = document.getElementById("appToastContainer");
 
+  // YouTube Cookies Sync Elements
+  const cookieNoticeBanner = document.getElementById("cookieNoticeBanner");
+  const cookieBannerMsg = document.getElementById("cookieBannerMsg");
+  const btnBannerRefreshCookies = document.getElementById("btnBannerRefreshCookies");
+  const btnBannerDismissCookies = document.getElementById("btnBannerDismissCookies");
+  const btnSyncCookiesNow = document.getElementById("btnSyncCookiesNow");
+  const cookieSyncStatus = document.getElementById("cookieSyncStatus");
+
   // Batch Download Elements
   const btnBatchDownload = document.getElementById("btnBatchDownload");
   const btnBatchDownloadText = document.getElementById("btnBatchDownloadText");
@@ -325,7 +333,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!toastContainer) return;
     const toast = document.createElement("div");
     toast.className = `app-toast ${type}`;
-    const icon = type === "success" ? "✓" : (type === "error" ? "⚠️" : (type === "flow" ? "🌊" : "🎵"));
+    const icon = type === "success" ? "✓" : (type === "error" ? "⚠️" : (type === "warning" ? "⚠️" : (type === "flow" ? "🌊" : "🎵")));
     toast.innerHTML = `
       <span class="toast-icon">${icon}</span>
       <span class="toast-msg">${message}</span>
@@ -3678,6 +3686,55 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // YouTube Cookie Verification & Browser Sync Helper
+  async function performCookieSync() {
+    if (cookieSyncStatus) cookieSyncStatus.textContent = "Syncing...";
+    if (btnSyncCookiesNow) btnSyncCookiesNow.disabled = true;
+    if (btnBannerRefreshCookies) btnBannerRefreshCookies.disabled = true;
+
+    try {
+      const res = await fetch("/api/cookies/sync");
+      const data = await res.json();
+      if (data.status === "success") {
+        showToast(data.message || "✓ YouTube connection verified!", "success");
+        if (cookieNoticeBanner) cookieNoticeBanner.classList.add("hidden");
+        if (cookieSyncStatus) {
+          cookieSyncStatus.textContent = `Verified (${data.browser || "Active"})`;
+          cookieSyncStatus.style.color = "#34d399";
+        }
+      } else if (data.status === "edge_open") {
+        showToast("⚠️ Microsoft Edge is currently open! Please close Edge for 5 seconds and click Sync again.", "warning");
+        if (cookieSyncStatus) {
+          cookieSyncStatus.textContent = "Close Edge (Locked)";
+          cookieSyncStatus.style.color = "#f59e0b";
+        }
+      } else {
+        showToast(`⚠️ Sync notice: ${data.message || "Verification needed"}`, "warning");
+        if (cookieSyncStatus) {
+          cookieSyncStatus.textContent = "Sync Failed";
+          cookieSyncStatus.style.color = "#ef4444";
+        }
+      }
+    } catch (err) {
+      showToast("Could not communicate with cookie sync service.", "error");
+    } finally {
+      if (btnSyncCookiesNow) btnSyncCookiesNow.disabled = false;
+      if (btnBannerRefreshCookies) btnBannerRefreshCookies.disabled = false;
+    }
+  }
+
+  if (btnBannerRefreshCookies) {
+    btnBannerRefreshCookies.addEventListener("click", () => performCookieSync());
+  }
+  if (btnBannerDismissCookies) {
+    btnBannerDismissCookies.addEventListener("click", () => {
+      if (cookieNoticeBanner) cookieNoticeBanner.classList.add("hidden");
+    });
+  }
+  if (btnSyncCookiesNow) {
+    btnSyncCookiesNow.addEventListener("click", () => performCookieSync());
+  }
+
   // =========================================================================
   // 9. QUEUE DRAWER & LIVE POLLING
   // =========================================================================
@@ -3758,6 +3815,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const active = data.active;
       const queue = data.queue || [];
       const history = data.history || [];
+
+      // Check for YouTube cookie verification notice
+      if (data.cookie_notice && cookieNoticeBanner) {
+        if (cookieBannerMsg) cookieBannerMsg.textContent = data.cookie_notice;
+        cookieNoticeBanner.classList.remove("hidden");
+      }
 
       let totalActive = queue.length + (active ? 1 : 0);
       if (totalActive > 0) {

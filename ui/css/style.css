@@ -3874,6 +3874,91 @@ body:has(#inspectDrawer:not(.hidden)) .player-dock-pill {
   line-height: 1.4;
 }
 
+.app-toast.warning {
+  border-color: rgba(245, 158, 11, 0.45);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(245, 158, 11, 0.25);
+}
+
+/* 🍪 YouTube Verification Notice Banner */
+.cookie-notice-banner {
+  margin: 12px 24px 0 24px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(217, 119, 6, 0.08));
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: var(--radius-md, 10px);
+  padding: 10px 16px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  animation: fadeInDown 0.3s ease;
+}
+
+.cookie-notice-banner.hidden {
+  display: none !important;
+}
+
+.cookie-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.cookie-banner-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.cookie-banner-text {
+  flex: 1;
+  min-width: 260px;
+  font-size: 13px;
+  color: #fde68a;
+  line-height: 1.4;
+}
+
+.cookie-banner-text strong {
+  color: #fff;
+  margin-right: 4px;
+}
+
+.cookie-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-banner-action {
+  background: #f59e0b;
+  color: #0b0f19;
+  font-size: 12px;
+  font-weight: 700;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-banner-action:hover {
+  background: #fbbf24;
+  transform: translateY(-1px);
+}
+
+.btn-banner-dismiss {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd5e1;
+  border-radius: 6px;
+  padding: 5px 9px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-banner-dismiss:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
 /* =========================================================================
    ONBOARDING & FIRST-TIME SETUP WIZARD
 ========================================================================= */

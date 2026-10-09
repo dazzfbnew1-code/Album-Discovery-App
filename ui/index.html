@@ -286,6 +286,21 @@
           </div>
         </div>
 
+        <!-- 🍪 YouTube Connection Notification Banner -->
+        <div id="cookieNoticeBanner" class="cookie-notice-banner hidden">
+          <div class="cookie-banner-content">
+            <span class="cookie-banner-icon">🍪</span>
+            <div class="cookie-banner-text">
+              <strong id="cookieBannerTitle">YouTube Connection Check:</strong>
+              <span id="cookieBannerMsg">YouTube is asking for verification. If using Microsoft Edge, please close Edge for 5 seconds and click Refresh.</span>
+            </div>
+            <div class="cookie-banner-actions">
+              <button id="btnBannerRefreshCookies" class="btn-banner-action">🔄 Refresh Connection</button>
+              <button id="btnBannerDismissCookies" class="btn-banner-dismiss" title="Dismiss">✕</button>
+            </div>
+          </div>
+        </div>
+
         <!-- 🎯 Discography Gap Radar & Complete Collection Banner -->
         <div id="artistGapBanner" class="artist-gap-banner hidden">
           <div class="gap-banner-left">
@@ -687,6 +702,19 @@
                 <input type="checkbox" id="settingSaveCoverJpg" checked />
                 <span>Save standalone <code>cover.jpg</code> in album folder</span>
               </label>
+            </div>
+
+            <div class="setting-group" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06);">
+              <label class="setting-label">YouTube Verification & Browser Sync</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <button type="button" id="btnSyncCookiesNow" class="btn-rescan-settings" style="flex: 1;" title="Sync YouTube verification cookies from Edge or Firefox">
+                  <span>🍪 Sync YouTube Connection</span>
+                </button>
+                <span id="cookieSyncStatus" style="font-size: 11px; color: #94a3b8; font-weight: 600;">Ready</span>
+              </div>
+              <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                If YouTube ever prompts for verification, simply close Microsoft Edge for 5 seconds and click Sync.
+              </div>
             </div>
           </div>
 
