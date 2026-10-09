@@ -872,8 +872,6 @@ class DownloadManager:
         if not safe_out.exists() or safe_out.stat().st_size < 50000:
             _cleanup_partial_artifacts()
             err_msg = str(last_err) if last_err else "No playable audio stream or candidates resolved across primary and fallback searches"
-            if any(k in err_msg.lower() for k in ["bot", "cookies", "sign in", "confirm you're not a bot", "permission denied", "errno 13"]):
-                self.cookie_notice = "YouTube requires a browser check. If using Microsoft Edge, please close Edge for 5 seconds and click 'Refresh Connection'!"
             raise RuntimeError(f"Could not download audio track '{title}': {err_msg}")
 
     def _tag_audio_file(self, file_path: str, title: str, artist: str, album: str, track_no: int, total_tracks: int, year: str, cover_path: str = None, ext: str = "mp3", lyrics: str = ""):
@@ -956,7 +954,6 @@ def sync_browser_cookies() -> dict:
         }
         with yt_dlp.YoutubeDL(ydl_opts_ff) as ydl:
             ydl.extract_info("https://www.youtube.com/watch?v=45cYwDMibGo", download=False)
-        DOWNLOAD_MANAGER.cookie_notice = None
         log_download("[COOKIES SYNC] Successfully updated YouTube cookies from Firefox.")
         return {
             "status": "success",
@@ -977,7 +974,7 @@ def sync_browser_cookies() -> dict:
         return {
             "status": "edge_open",
             "browser": "Edge",
-            "message": "Microsoft Edge is currently open. Please close Microsoft Edge for 5 seconds and click Sync again!"
+            "message": "Microsoft Edge is currently open."
         }
 
     # 3. Extract from Microsoft Edge (now that Edge is closed)
@@ -990,12 +987,11 @@ def sync_browser_cookies() -> dict:
         }
         with yt_dlp.YoutubeDL(ydl_opts_edge) as ydl:
             ydl.extract_info("https://www.youtube.com/watch?v=45cYwDMibGo", download=False)
-        DOWNLOAD_MANAGER.cookie_notice = None
         log_download("[COOKIES SYNC] Successfully updated YouTube cookies from Microsoft Edge.")
         return {
             "status": "success",
             "browser": "Edge",
-            "message": "YouTube connection verified and updated from Microsoft Edge! You can reopen Edge now."
+            "message": "YouTube connection verified and updated from Microsoft Edge!"
         }
     except Exception as e:
         log_error(f"[COOKIES SYNC ERROR] {e}")
@@ -1004,3 +1000,36 @@ def sync_browser_cookies() -> dict:
             "browser": "Edge",
             "message": f"Could not sync from Edge: {e}"
         }
+
+_COOKIE_SYNC_STARTED = False
+_COOKIE_SYNC_LOCK = threading.Lock()
+
+def auto_sync_cookies_background():
+    """Silently and automatically ensures YouTube cookies are maintained in the background without UI interruption."""
+    global _COOKIE_SYNC_STARTED
+    with _COOKIE_SYNC_LOCK:
+        if _COOKIE_SYNC_STARTED:
+            return
+        _COOKIE_SYNC_STARTED = True
+
+    def _worker():
+        time.sleep(5.0)
+        while True:
+            try:
+                cookies_path = Path(__file__).parent.parent / "data" / "cookies.txt"
+                needs_refresh = True
+                if cookies_path.exists() and cookies_path.stat().st_size > 500:
+                    age_seconds = time.time() - cookies_path.stat().st_mtime
+                    if age_seconds < 86400:
+                        needs_refresh = False
+
+                if needs_refresh:
+                    sync_browser_cookies()
+            except Exception:
+                pass
+            time.sleep(1800)
+
+    t = threading.Thread(target=_worker, name="SilentCookieAutoSync", daemon=True)
+    t.start()
+
+auto_sync_cookies_background()

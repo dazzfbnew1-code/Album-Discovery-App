@@ -102,6 +102,10 @@ def resolve_full_audio_stream(artist: str, title: str) -> dict:
         opts_ff["cookiesfrombrowser"] = ("firefox",)
         stream_configs.append(opts_ff)
 
+        opts_edge = dict(stream_opts)
+        opts_edge["cookiesfrombrowser"] = ("edge",)
+        stream_configs.append(opts_edge)
+
         opts_mobile = dict(stream_opts)
         opts_mobile["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
         stream_configs.append(opts_mobile)

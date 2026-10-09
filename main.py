@@ -59,8 +59,9 @@ def main():
         sys.exit(0)
 
     try:
-        from app.downloader import auto_update_ytdlp_background
+        from app.downloader import auto_update_ytdlp_background, auto_sync_cookies_background
         auto_update_ytdlp_background()
+        auto_sync_cookies_background()
     except Exception:
         pass
 
