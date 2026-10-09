@@ -178,6 +178,52 @@ def get_library_status() -> dict:
             "is_scanning": IS_SCANNING
         }
 
+def extract_local_album_metadata(folder_path: Path, audio_files: list, album_name: str) -> tuple:
+    """Extract release year and category type (single, ep, compilation, live, deluxe, album) from local folder and tags."""
+    year = ""
+    # 1. First check if year is in the folder name (e.g. "All Eyez On Me (1996)")
+    m = re.search(r'\b(19\d\d|20\d\d)\b', album_name)
+    if m:
+        year = m.group(1)
+
+    # 2. If no year in folder name, read ID3 tag from the first audio file
+    if not year and audio_files:
+        try:
+            from mutagen import File as MutagenFile
+            first_audio = folder_path / audio_files[0]
+            if first_audio.exists():
+                mf = MutagenFile(str(first_audio))
+                if mf and mf.tags:
+                    for k in ["TDRC", "date", "year", "TYER", "ORIGINALDATE", "recording_time"]:
+                        v = mf.tags.get(k)
+                        if v:
+                            v_str = str(v[0] if isinstance(v, list) else v)
+                            ym = re.search(r'\b(19\d\d|20\d\d)\b', v_str)
+                            if ym:
+                                year = ym.group(1)
+                                break
+        except Exception:
+            pass
+
+    # 3. Determine release category type
+    num_tracks = len(audio_files)
+    t_low = album_name.lower()
+
+    if any(k in t_low for k in ["greatest hits", "best of", "anthology", "collection", "gold", "the hits", "essentials", "platinum collection", "mixtape", "lost tape", "lost tapes"]):
+        rec_type = "compilation"
+    elif any(k in t_low for k in ["live", "concert", "tour", "unplugged", "in concert"]):
+        rec_type = "live"
+    elif any(k in t_low for k in ["deluxe", "anniversary", "remastered", "expanded"]):
+        rec_type = "deluxe"
+    elif num_tracks == 1 or " - single" in t_low or "(single)" in t_low:
+        rec_type = "single"
+    elif 1 < num_tracks <= 6:
+        rec_type = "ep"
+    else:
+        rec_type = "album"
+
+    return year, rec_type
+
 def scan_local_library(custom_root: str = None) -> dict:
     global OWNED_ALBUMS, OWNED_BY_ARTIST, OWNED_TITLES, LAST_SCAN_TIME, IS_SCANNING
     with _LOCK:
@@ -202,7 +248,7 @@ def scan_local_library(custom_root: str = None) -> dict:
         # 1. Also load recorded downloaded albums from music_library.db
         with get_library_conn() as conn:
             c = conn.cursor()
-            c.execute("SELECT id, title, artist, dest_path, track_count FROM downloaded_albums")
+            c.execute("SELECT id, title, artist, dest_path, track_count, year FROM downloaded_albums")
             for row in c.fetchall():
                 p_str = row["dest_path"] or ""
                 art_name = row["artist"] or ""
@@ -218,6 +264,8 @@ def scan_local_library(custom_root: str = None) -> dict:
                     "album": alb_name,
                     "path": p_str,
                     "track_count": row["track_count"] or 0,
+                    "year": str(row["year"] or ""),
+                    "type": "album",
                     "id": str(row["id"])
                 }
                 scanned_albums[key] = alb_info
@@ -264,12 +312,15 @@ def scan_local_library(custom_root: str = None) -> dict:
                     if "$recycle" in artist_name.lower() or "$recycle" in album_name.lower():
                         continue
 
+                    year_str, rec_type = extract_local_album_metadata(cur_path, audio_files, album_name)
                     key = make_album_key(artist_name, album_name)
                     alb_info = {
                         "artist": artist_name,
                         "album": album_name,
                         "path": str(cur_path),
                         "track_count": len(audio_files),
+                        "year": year_str,
+                        "type": rec_type,
                         "id": ""
                     }
                     scanned_albums[key] = alb_info
@@ -301,6 +352,7 @@ def scan_local_library(custom_root: str = None) -> dict:
                     "norm_album": normalize_text(info["album"]),
                     "path": p,
                     "track_count": info.get("track_count", 0),
+                    "year": info.get("year", ""),
                     "source": "downloaded" if info.get("id") else "disk"
                 })
             save_library_albums_batch(batch_to_save)
@@ -415,6 +467,8 @@ def init_library_cache():
                 "album": alb_name,
                 "path": p_str,
                 "track_count": row.get("track_count") or 0,
+                "year": str(row.get("year") or ""),
+                "type": "album",
                 "id": ""
             }
             primed_albums[key] = alb_info
@@ -426,7 +480,7 @@ def init_library_cache():
         # 2. Also ensure downloaded albums are merged
         with get_library_conn() as conn:
             c = conn.cursor()
-            c.execute("SELECT id, title, artist, dest_path, track_count FROM downloaded_albums")
+            c.execute("SELECT id, title, artist, dest_path, track_count, year FROM downloaded_albums")
             for row in c.fetchall():
                 p_str = row["dest_path"] or ""
                 art_name = row["artist"] or ""
@@ -439,6 +493,8 @@ def init_library_cache():
                     "album": alb_name,
                     "path": p_str,
                     "track_count": row["track_count"] or 0,
+                    "year": str(row["year"] or ""),
+                    "type": "album",
                     "id": str(row["id"])
                 }
                 primed_albums[key] = alb_info
@@ -487,15 +543,53 @@ def get_library_albums(query: str = "") -> list:
         cov_file_str = resolve_local_album_cover(p)
         cover_url = f"/api/local-file?path={urllib.parse.quote(cov_file_str)}" if cov_file_str else ""
         
+        year_val = str(item.get("year") or "").strip()
+        type_val = item.get("type") or ""
+
+        # Dynamic fallback resolution if year is missing from in-memory cache
+        if not year_val:
+            m = re.search(r'\b(19\d\d|20\d\d)\b', alb)
+            if m:
+                year_val = m.group(1)
+            try:
+                audios = [f.name for f in p.iterdir() if f.suffix.lower() in AUDIO_EXTS]
+                if audios:
+                    y, t = extract_local_album_metadata(p, audios, alb)
+                    if not year_val:
+                        year_val = y
+                    if not type_val or type_val == "album":
+                        type_val = t
+            except Exception:
+                pass
+            item["year"] = year_val
+
+        # Refine category type based on title keywords and track count
+        t_low = alb.lower()
+        tr_count = int(item.get("track_count") or 0)
+        if any(k in t_low for k in ["greatest hits", "best of", "anthology", "collection", "gold", "the hits", "essentials", "platinum collection", "mixtape", "lost tape", "lost tapes"]):
+            type_val = "compilation"
+        elif any(k in t_low for k in ["live", "concert", "tour", "unplugged", "in concert"]):
+            type_val = "live"
+        elif any(k in t_low for k in ["deluxe", "anniversary", "remastered", "expanded"]):
+            type_val = "deluxe"
+        elif tr_count == 1 or " - single" in t_low or "(single)" in t_low:
+            type_val = "single"
+        elif 1 < tr_count <= 6 or " ep" in t_low or "(ep)" in t_low:
+            type_val = "ep"
+        else:
+            type_val = type_val or "album"
+
+        item["type"] = type_val
+
         results.append({
             "id": f"local_{hash(p_str)}",
             "title": alb,
             "artist": art,
             "cover_small": cover_url,
             "cover_big": cover_url,
-            "year": "",
+            "year": year_val,
             "track_count": item.get("track_count", 0),
-            "type": "album",
+            "type": type_val or "album",
             "owned": True,
             "owned_path": p_str
         })

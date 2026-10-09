@@ -253,6 +253,28 @@ def get_genre_charts(genre: str = "all", limit: int = 100, force_refresh: bool =
                 st = is_album_owned(a.get("artist", ""), a.get("title", ""))
                 a["owned"] = st.get("owned", False)
                 a["owned_path"] = st.get("path", "")
+
+            # Rapidly self-heal any missing release years in cached albums
+            missing_cached_years = [a for a in albs[:50] if not a.get("year")]
+            if missing_cached_years:
+                def _heal_cached_year(alb_item):
+                    aid = str(alb_item.get("id") or "")
+                    if not aid or aid.startswith("local_"):
+                        return
+                    try:
+                        d = fetch_json(f"https://api.deezer.com/album/{aid}", timeout=2.5)
+                        if d and d.get("release_date"):
+                            rel_d = str(d["release_date"]).strip()
+                            y = rel_d[:4]
+                            if len(y) == 4 and y.isdigit():
+                                alb_item["release_date"] = rel_d
+                                alb_item["year"] = y
+                    except Exception:
+                        pass
+                with ThreadPoolExecutor(max_workers=8) as ex:
+                    list(ex.map(_heal_cached_year, missing_cached_years))
+                save_cached_charts(genre_clean, {"genre": genre_clean, "albums": albs})
+
             log_discovery(f"[CACHE HIT] Genre '{genre_clean}' loaded {len(albs)} albums (with live drive ownership check) (took {time.time() - start_t:.3f}s)")
             return {"genre": genre_clean, "albums": albs[:limit] if limit > 0 else albs}
 
@@ -544,6 +566,38 @@ def get_genre_charts(genre: str = "all", limit: int = 100, force_refresh: bool =
 
     # Cap harvested reserve pool to exactly top 1,000 landmark albums
     cleaned = cleaned[:1000]
+
+    # Rapidly resolve missing release years for top landmark albums
+    missing_year_items = [r for r in cleaned[:60] if not r.get("year")]
+    if missing_year_items:
+        def _fill_fresh_year(album_item):
+            aid = str(album_item.get("id") or "")
+            if not aid or aid.startswith("local_"):
+                return
+            try:
+                d = fetch_json(f"https://api.deezer.com/album/{aid}", timeout=2.5)
+                if d and d.get("release_date"):
+                    rel_d = str(d["release_date"]).strip()
+                    y = rel_d[:4]
+                    if len(y) == 4 and y.isdigit():
+                        album_item["release_date"] = rel_d
+                        album_item["year"] = y
+                        save_cached_album(aid, {
+                            "id": aid,
+                            "title": album_item.get("title", ""),
+                            "artist": album_item.get("artist", ""),
+                            "year": y,
+                            "release_date": rel_d,
+                            "cover_big": album_item.get("cover_big", ""),
+                            "cover_small": album_item.get("cover_small", ""),
+                            "track_count": album_item.get("track_count", 0),
+                            "type": album_item.get("type", "album")
+                        })
+            except Exception:
+                pass
+
+        with ThreadPoolExecutor(max_workers=10) as ex:
+            list(ex.map(_fill_fresh_year, missing_year_items))
 
     if not cleaned and cached:
         log_discovery(f"[FALLBACK CACHE] Serving cached data for '{genre_clean}'")

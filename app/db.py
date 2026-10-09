@@ -509,6 +509,7 @@ def save_library_albums_batch(albums_list: list):
                         path = excluded.path,
                         track_count = excluded.track_count,
                         mtime = excluded.mtime,
+                        year = CASE WHEN excluded.year != '' THEN excluded.year ELSE library_albums.year END,
                         cover_path = COALESCE(excluded.cover_path, library_albums.cover_path),
                         updated_at = datetime('now', 'localtime')
                 """, (
