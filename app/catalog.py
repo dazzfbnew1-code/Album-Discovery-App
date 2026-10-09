@@ -1311,6 +1311,12 @@ def get_album_details(album_id: str, force_refresh: bool = False):
                     log_discovery(f"[COVER AUTO-BACKFILLED] Saved missing cover.jpg for '{album_title}'")
         except Exception:
             pass
+    cov_sm = data.get("cover_medium") or resolved_art
+    for tr in tracks:
+        tr["album"] = album_title
+        tr["cover_big"] = resolved_art
+        tr["cover_small"] = cov_sm
+        tr["year"] = accurate_year
 
     payload = {
         "id": str(data.get("id")),

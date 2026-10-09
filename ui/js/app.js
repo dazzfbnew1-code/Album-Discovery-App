@@ -65,7 +65,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const playerTrackTitle = document.getElementById("playerTrackTitle");
   const playerArtistName = document.getElementById("playerArtistName");
   const hudAlbumTitle = document.getElementById("hudAlbumTitle");
-  const playerBadge = hudAlbumTitle;
   const currentTimeLabel = document.getElementById("currentTimeLabel");
   const durationTimeLabel = document.getElementById("durationTimeLabel");
   const playerScrubBar = document.getElementById("playerScrubBar");
@@ -256,13 +255,22 @@ document.addEventListener("DOMContentLoaded", () => {
   let searchDebounceTimer = null;
   let activeSearchAbortController = null;
   let currentSearchSequenceId = 0;
-  let currentAlbumDetails = null;
-  let currentTracklist = [];
-  let currentTrackIndex = -1;
+
+  // Active Playback Engine State (Decoupled from Modal/Drawer Viewers)
+  let playingAlbumDetails = null;
+  let playingTracklist = [];
+  let playingTrackIndex = -1;
   let isPlaying = false;
   let isFullAlbumMode = false;
   let isLibraryRadioMode = false;
   let isFetchingMoreRadioTracks = false;
+
+  // Modal & Drawer Inspection State (Browsing albums without interrupting playback)
+  let modalAlbumDetails = null;
+  let modalTracklistData = [];
+  let currentAlbumDetails = null; // backward compatibility
+  let currentTracklist = [];      // backward compatibility
+  let currentTrackIndex = -1;     // backward compatibility
   let configData = {};
   let currentArtistDiscography = null;
   let currentCategoryFilter = "all";
@@ -374,7 +382,7 @@ document.addEventListener("DOMContentLoaded", () => {
     smartHud.classList.add("stealth");
     if (btnHeaderPlayerToggle) btnHeaderPlayerToggle.classList.remove("active");
     // Show mini dock pill if music is loaded or active
-    if (activeDeck.src || isPlaying || (currentTracklist && currentTracklist.length > 0)) {
+    if (activeDeck.src || isPlaying || (playingTracklist && playingTracklist.length > 0)) {
       if (playerDockPill) playerDockPill.classList.remove("hidden");
     }
   }
@@ -408,7 +416,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ? `/api/local-file?path=${encodeURIComponent(track.local_path)}`
         : (track.stream_url || track.preview || "");
     }
-    const artist = track.artist || (currentAlbumDetails && currentAlbumDetails.artist) || "Unknown Artist";
+    const artist = track.artist || (playingAlbumDetails && playingAlbumDetails.artist) || (modalAlbumDetails && modalAlbumDetails.artist) || (currentAlbumDetails && currentAlbumDetails.artist) || "Unknown Artist";
     if (isFullAlbumMode) {
       return `/api/stream/proxy?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(track.title)}`;
     }
@@ -416,9 +424,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function preloadNextTrack() {
-    if (!currentTracklist || currentTrackIndex < 0 || currentTrackIndex + 1 >= currentTracklist.length) return;
-    const nextIndex = currentTrackIndex + 1;
-    const nextTrack = currentTracklist[nextIndex];
+    if (!playingTracklist || playingTrackIndex < 0 || playingTrackIndex + 1 >= playingTracklist.length) return;
+    const nextIndex = playingTrackIndex + 1;
+    const nextTrack = playingTracklist[nextIndex];
     if (!nextTrack) return;
     const nextUrl = getTrackPlayUrl(nextTrack);
     if (!nextUrl) return;
@@ -432,7 +440,7 @@ document.addEventListener("DOMContentLoaded", () => {
     preloadedTrackIndex = nextIndex;
 
     // In DJ Radio mode, auto-fetch upcoming batch when approaching end of queue
-    if (isLibraryRadioMode && currentTrackIndex >= currentTracklist.length - 4 && !isFetchingMoreRadioTracks) {
+    if (isLibraryRadioMode && playingTrackIndex >= playingTracklist.length - 4 && !isFetchingMoreRadioTracks) {
       fetchMoreRadioTracks();
     }
   }
@@ -530,35 +538,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (btnRefreshLyrics) {
     btnRefreshLyrics.addEventListener("click", () => {
-      if (currentTracklist && currentTrackIndex >= 0 && currentTracklist[currentTrackIndex]) {
-        const tr = currentTracklist[currentTrackIndex];
-        const art = tr.artist || (currentAlbumDetails && currentAlbumDetails.artist) || "";
-        const alb = currentAlbumDetails ? currentAlbumDetails.title : "";
+      if (playingTracklist && playingTrackIndex >= 0 && playingTracklist[playingTrackIndex]) {
+        const tr = playingTracklist[playingTrackIndex];
+        const art = tr.artist || (playingAlbumDetails && playingAlbumDetails.artist) || "";
+        const alb = isLibraryRadioMode ? (tr.album || "Library DJ Radio") : (tr.album || (playingAlbumDetails ? playingAlbumDetails.title : ""));
+        loadTrackLyrics(art, tr.title, alb, tr.duration);
+      } else if (modalTracklistData && modalTracklistData.length > 0) {
+        const tr = modalTracklistData[0];
+        const art = tr.artist || (modalAlbumDetails && modalAlbumDetails.artist) || "";
+        const alb = tr.album || (modalAlbumDetails ? modalAlbumDetails.title : "");
         loadTrackLyrics(art, tr.title, alb, tr.duration);
       }
     });
   }
 
   function updatePlayerTrackUi(track, index) {
-    const artist = track.artist || (currentAlbumDetails && currentAlbumDetails.artist) || "Unknown Artist";
-    const albumTitle = isLibraryRadioMode ? (track.album || "Library DJ Radio") : (currentAlbumDetails ? currentAlbumDetails.title : "Album Discovery");
-    const coverArt = (track.cover_big || track.cover_small || (currentAlbumDetails && (currentAlbumDetails.cover_big || currentAlbumDetails.cover_small))) || window.FALLBACK_COVER_SVG;
+    if (!track) return;
+    const artist = track.artist || (playingAlbumDetails && playingAlbumDetails.artist) || "Unknown Artist";
+    const albumTitle = isLibraryRadioMode ? (track.album || "Library DJ Radio") : (track.album || (playingAlbumDetails && playingAlbumDetails.title) || "Album Discovery");
+    const coverArt = (track.cover_big || track.cover_small || (playingAlbumDetails && (playingAlbumDetails.cover_big || playingAlbumDetails.cover_small))) || window.FALLBACK_COVER_SVG;
+    const totalTracks = (playingTracklist && playingTracklist.length > 0) ? playingTracklist.length : 1;
+    const trackNumStr = `${index + 1}/${totalTracks}`;
 
     showPlayerHud();
     playerCoverImg.src = coverArt;
-    playerArtistName.textContent = `${artist} — ${albumTitle}`;
+    playerArtistName.textContent = artist;
     playerArtistName.title = `${artist} — ${albumTitle}`;
-    playerTrackTitle.textContent = `${track.title}`;
-    playerTrackTitle.title = track.title;
+    playerTrackTitle.textContent = track.title || "Unknown Track";
+    playerTrackTitle.title = track.title || "Unknown Track";
     currentTimeLabel.textContent = formatTime(0);
     playerScrubFill.style.width = "0%";
     durationTimeLabel.textContent = isFullAlbumMode ? (track.duration ? formatTime(track.duration) : "0:00") : "0:30";
     
+    // Display exact Album Title in HUD tag (never overwritten by mode badges)
+    hudAlbumTitle.textContent = albumTitle.toUpperCase();
+    hudAlbumTitle.title = albumTitle;
+
+    // Display Format Quality & Track Counter
+    if (hudQualityPill) {
+      if (isLibraryRadioMode) {
+        hudQualityPill.textContent = `DJ RADIO • ${trackNumStr}`;
+        hudQualityPill.className = "hud-quality-pill radio";
+      } else if (track.local_path || track.is_local) {
+        hudQualityPill.textContent = `320K MASTER • ${trackNumStr}`;
+        hudQualityPill.className = "hud-quality-pill master";
+      } else if (isFullAlbumMode) {
+        hudQualityPill.textContent = `STUDIO • ${trackNumStr}`;
+        hudQualityPill.className = "hud-quality-pill";
+      } else {
+        hudQualityPill.textContent = `30S PREVIEW • ${trackNumStr}`;
+        hudQualityPill.className = "hud-quality-pill";
+      }
+    }
+
     // Sync Mini Dock Pill
     if (dockPillCover) dockPillCover.src = coverArt;
     if (dockPillTitle) {
-      dockPillTitle.textContent = track.title;
-      dockPillTitle.title = track.title;
+      dockPillTitle.textContent = track.title || "Unknown Track";
+      dockPillTitle.title = track.title || "Unknown Track";
     }
     if (dockPillArtist) {
       dockPillArtist.textContent = `${artist} — ${albumTitle}`;
@@ -584,42 +621,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (configData && configData.auto_open_lyrics) {
       openLyricsForCurrentTrack();
     }
-
-    // Update Player Badge and Hi-Fi Audio Quality Pill
-    if (isLibraryRadioMode) {
-      playerBadge.textContent = `📻 Library DJ Radio (${index + 1}/${currentTracklist.length})`;
-      hudAlbumTitle.textContent = "📻 LIBRARY RADIO (LIVE DJ MIX)";
-      if (hudQualityPill) {
-        hudQualityPill.textContent = "DJ RADIO MIX";
-        hudQualityPill.className = "hud-quality-pill radio";
-      }
-    } else if (track.local_path || track.is_local) {
-      playerBadge.textContent = `💾 Local Master (${index + 1}/${currentTracklist.length})`;
-      if (hudQualityPill) {
-        hudQualityPill.textContent = "320K MASTER";
-        hudQualityPill.className = "hud-quality-pill master";
-      }
-    } else if (isFullAlbumMode) {
-      playerBadge.textContent = `💿 Full Studio (${index + 1}/${currentTracklist.length})`;
-      if (hudQualityPill) {
-        hudQualityPill.textContent = "STUDIO MASTER";
-        hudQualityPill.className = "hud-quality-pill";
-      }
-    } else {
-      playerBadge.textContent = `⚡ 30s Audition (${index + 1}/${currentTracklist.length})`;
-      if (hudQualityPill) {
-        hudQualityPill.textContent = "30S PREVIEW";
-        hudQualityPill.className = "hud-quality-pill";
-      }
-    }
   }
 
   function triggerSeamlessTransition(crossfadeSec) {
     if (isCrossfading) return;
-    const nextIndex = currentTrackIndex + 1;
-    if (!currentTracklist || nextIndex >= currentTracklist.length) return;
+    const nextIndex = playingTrackIndex + 1;
+    if (!playingTracklist || nextIndex >= playingTracklist.length) return;
 
-    const nextTrack = currentTracklist[nextIndex];
+    const nextTrack = playingTracklist[nextIndex];
     const nextUrl = getTrackPlayUrl(nextTrack);
     if (!nextUrl) return;
 
@@ -647,6 +656,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Incoming deck is playing! Shift active controls and UI immediately
       activeDeck = incomingDeck;
       standbyDeck = outgoingDeck;
+      playingTrackIndex = nextIndex;
       currentTrackIndex = nextIndex;
       updatePlayerTrackUi(nextTrack, nextIndex);
       updatePlayPauseState(true);
@@ -700,12 +710,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function playTrackAtIndex(index, fullAlbum = false, startTime = 0) {
-    if (!currentTracklist || index < 0 || index >= currentTracklist.length) return;
+    if (!playingTracklist || index < 0 || index >= playingTracklist.length) return;
     
     cancelCrossfade();
+    playingTrackIndex = index;
     currentTrackIndex = index;
     isFullAlbumMode = fullAlbum;
-    const track = currentTracklist[index];
+    const track = playingTracklist[index];
     const targetUrl = getTrackPlayUrl(track);
 
     updatePlayerTrackUi(track, index);
@@ -801,8 +812,8 @@ document.addEventListener("DOMContentLoaded", () => {
             standbyDeck.play().catch(() => {});
           }
         });
-      } else if (currentTracklist.length > 0) {
-        playTrackAtIndex(0, isFullAlbumMode);
+      } else if (playingTracklist.length > 0) {
+        playTrackAtIndex(playingTrackIndex >= 0 ? playingTrackIndex : 0, isFullAlbumMode);
       }
     } else {
       pauseTrack();
@@ -841,23 +852,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function playNextTrack(isAutoAdvancement = false) {
-    if (isLibraryRadioMode && currentTrackIndex >= currentTracklist.length - 3 && !isFetchingMoreRadioTracks) {
+    if (isLibraryRadioMode && playingTrackIndex >= playingTracklist.length - 3 && !isFetchingMoreRadioTracks) {
       fetchMoreRadioTracks();
     }
-    if (!currentTracklist || currentTracklist.length === 0) return;
+    if (!playingTracklist || playingTracklist.length === 0) return;
 
     // Repeat One Mode (triggers on natural song completion)
-    if (isAutoAdvancement && repeatMode === "one" && currentTrackIndex >= 0) {
-      playTrackAtIndex(currentTrackIndex, isFullAlbumMode);
+    if (isAutoAdvancement && repeatMode === "one" && playingTrackIndex >= 0) {
+      playTrackAtIndex(playingTrackIndex, isFullAlbumMode);
       return;
     }
 
     // Shuffle Mode: Pick a randomized next track
-    if (isShuffle && currentTracklist.length > 1) {
-      let nextIdx = Math.floor(Math.random() * currentTracklist.length);
+    if (isShuffle && playingTracklist.length > 1) {
+      let nextIdx = Math.floor(Math.random() * playingTracklist.length);
       let attempts = 0;
-      while (nextIdx === currentTrackIndex && attempts < 10) {
-        nextIdx = Math.floor(Math.random() * currentTracklist.length);
+      while (nextIdx === playingTrackIndex && attempts < 10) {
+        nextIdx = Math.floor(Math.random() * playingTracklist.length);
         attempts++;
       }
       playTrackAtIndex(nextIdx, isFullAlbumMode);
@@ -865,10 +876,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Sequential Next Track
-    if (currentTrackIndex + 1 < currentTracklist.length) {
-      playTrackAtIndex(currentTrackIndex + 1, isFullAlbumMode);
+    if (playingTrackIndex + 1 < playingTracklist.length) {
+      playTrackAtIndex(playingTrackIndex + 1, isFullAlbumMode);
     } else if (repeatMode === "all" || isFullAlbumMode || isLibraryRadioMode) {
-      playTrackAtIndex(0, true);
+      playTrackAtIndex(0, isFullAlbumMode);
     }
   }
 
@@ -879,10 +890,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("/api/library/radio?limit=30");
       const data = await res.json();
       if (data && data.status === "ok" && Array.isArray(data.tracks)) {
-        const existingPaths = new Set(currentTracklist.map(t => t.local_path || t.id));
+        const existingPaths = new Set(playingTracklist.map(t => t.local_path || t.id));
         const fresh = data.tracks.filter(t => !existingPaths.has(t.local_path || t.id));
         if (fresh.length > 0) {
-          currentTracklist.push(...fresh);
+          playingTracklist.push(...fresh);
         }
       }
     } catch (e) {
@@ -893,16 +904,35 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function playPrevTrack() {
-    if (currentTrackIndex - 1 >= 0) {
-      playTrackAtIndex(currentTrackIndex - 1, isFullAlbumMode);
-    } else if (currentTracklist.length > 0) {
-      playTrackAtIndex(currentTracklist.length - 1, isFullAlbumMode);
+    if (playingTrackIndex - 1 >= 0) {
+      playTrackAtIndex(playingTrackIndex - 1, isFullAlbumMode);
+    } else if (playingTracklist.length > 0) {
+      playTrackAtIndex(playingTracklist.length - 1, isFullAlbumMode);
     }
   }
 
   function highlightActiveTrack() {
-    document.querySelectorAll(".track-row").forEach((el, idx) => {
-      if (idx === currentTrackIndex) {
+    // 1. Highlight rows in album modal IF the viewed modal matches the playing album
+    const isModalPlayingThisAlbum = modalAlbumDetails && playingAlbumDetails && 
+      (String(modalAlbumDetails.id) === String(playingAlbumDetails.id) || 
+       (modalAlbumDetails.title && modalAlbumDetails.title.toLowerCase() === (playingAlbumDetails.title || "").toLowerCase()));
+
+    document.querySelectorAll("#modalTracklist .track-row").forEach((el, idx) => {
+      if (isModalPlayingThisAlbum && idx === playingTrackIndex) {
+        el.classList.add("playing");
+      } else {
+        el.classList.remove("playing");
+      }
+    });
+
+    // 2. Highlight rows in inspect drawer IF the viewed drawer matches the playing album
+    const isDrawerPlayingThisAlbum = currentInspectAlbum && playingAlbumDetails && 
+      (String(currentInspectAlbum.id) === String(playingAlbumDetails.id) || 
+       (currentInspectAlbum.title && currentInspectAlbum.title.toLowerCase() === (playingAlbumDetails.title || "").toLowerCase()));
+
+    document.querySelectorAll(".drawer-track-row").forEach((el) => {
+      const idx = parseInt(el.dataset.trackIdx, 10);
+      if (isDrawerPlayingThisAlbum && idx === playingTrackIndex) {
         el.classList.add("playing");
       } else {
         el.classList.remove("playing");
@@ -926,8 +956,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Check seamless track transition
     if (isCrossfading) return;
-    const nextIndex = currentTrackIndex + 1;
-    const hasNext = currentTracklist && (nextIndex < currentTracklist.length);
+    const nextIndex = playingTrackIndex + 1;
+    const hasNext = playingTracklist && (nextIndex < playingTracklist.length);
     if (!hasNext) {
       if (isLibraryRadioMode && !isFetchingMoreRadioTracks) {
         fetchMoreRadioTracks();
@@ -1123,34 +1153,39 @@ document.addEventListener("DOMContentLoaded", () => {
   syncBodyModalState();
 
   function openLyricsForCurrentTrack() {
+    if (!playingTracklist || playingTrackIndex < 0 || !playingTracklist[playingTrackIndex]) return;
+    const tr = playingTracklist[playingTrackIndex];
+    const art = tr.artist || (playingAlbumDetails && playingAlbumDetails.artist) || "Unknown Artist";
+    const alb = isLibraryRadioMode ? (tr.album || "Library DJ Radio") : (tr.album || (playingAlbumDetails ? playingAlbumDetails.title : "Album Discovery"));
+    const cov = (tr.cover_big || tr.cover_small || (playingAlbumDetails && (playingAlbumDetails.cover_big || playingAlbumDetails.cover_small))) || window.FALLBACK_COVER_SVG;
+
     albumModal.classList.remove("hidden");
     switchModalTab("lyrics");
-    if (currentTracklist && currentTrackIndex >= 0 && currentTracklist[currentTrackIndex]) {
-      const tr = currentTracklist[currentTrackIndex];
-      const art = tr.artist || (currentAlbumDetails && currentAlbumDetails.artist) || "Unknown Artist";
-      const alb = tr.album || (currentAlbumDetails ? currentAlbumDetails.title : "") || tr.title;
-      const cov = (tr.cover_big || tr.cover_small || (currentAlbumDetails && (currentAlbumDetails.cover_big || currentAlbumDetails.cover_small))) || window.FALLBACK_COVER_SVG;
 
-      modalCoverArt.onerror = () => { modalCoverArt.src = window.FALLBACK_COVER_SVG; };
-      modalCoverArt.src = cov;
-      modalAlbumTitle.textContent = alb;
-      modalArtistName.textContent = art;
-      modalTracksCount.textContent = isLibraryRadioMode ? `📻 DJ Radio (${currentTracklist.length} Tracks)` : `🎵 ${currentTracklist.length} Tracks`;
-      modalTracklistTabCount.textContent = currentTracklist.length;
-      modalYearBadge.textContent = tr.year ? `📅 ${tr.year}` : (isLibraryRadioMode ? "📻 Live Mix" : "📅 Studio Album");
-      if (modalTypeBadge) modalTypeBadge.textContent = isLibraryRadioMode ? "LIBRARY DJ RADIO" : "STUDIO ALBUM";
-      if (modalGenreBadge) modalGenreBadge.textContent = isLibraryRadioMode ? "⚡ DJ Radio Mix" : "⚡ Music";
-      if (modalLabelBadge) modalLabelBadge.textContent = isLibraryRadioMode ? "🏷️ Local Library Collection" : "🏷️ Studio Release";
-      if (modalBarcodeBadge) modalBarcodeBadge.textContent = "📦 High-Fidelity Audio";
-      if (modalDownloadBtnText) modalDownloadBtnText.textContent = "💾 In Library";
-      if (modalDownloadAlbumBtn) {
-        modalDownloadAlbumBtn.disabled = true;
-        modalDownloadAlbumBtn.style.opacity = "0.7";
-      }
-
-      renderTracklist(currentTracklist);
-      loadTrackLyrics(art, tr.title, alb, tr.duration);
+    modalCoverArt.onerror = () => { modalCoverArt.src = window.FALLBACK_COVER_SVG; };
+    modalCoverArt.src = cov;
+    modalAlbumTitle.textContent = alb;
+    modalArtistName.textContent = art;
+    modalTracksCount.textContent = isLibraryRadioMode ? `📻 DJ Radio (${playingTracklist.length} Tracks)` : `🎵 ${playingTracklist.length} Tracks`;
+    modalTracklistTabCount.textContent = playingTracklist.length;
+    modalYearBadge.textContent = tr.year ? `📅 ${tr.year}` : (isLibraryRadioMode ? "📻 Live Mix" : "📅 Studio Album");
+    if (modalTypeBadge) modalTypeBadge.textContent = isLibraryRadioMode ? "LIBRARY DJ RADIO" : "STUDIO ALBUM";
+    if (modalGenreBadge) modalGenreBadge.textContent = isLibraryRadioMode ? "⚡ DJ Radio Mix" : "⚡ Music";
+    if (modalLabelBadge) modalLabelBadge.textContent = isLibraryRadioMode ? "🏷️ Local Library Collection" : "🏷️ Studio Release";
+    if (modalBarcodeBadge) modalBarcodeBadge.textContent = "📦 High-Fidelity Audio";
+    if (modalDownloadBtnText) modalDownloadBtnText.textContent = "💾 In Library";
+    if (modalDownloadAlbumBtn) {
+      modalDownloadAlbumBtn.disabled = true;
+      modalDownloadAlbumBtn.style.opacity = "0.7";
     }
+
+    modalAlbumDetails = playingAlbumDetails;
+    modalTracklistData = playingTracklist;
+    currentAlbumDetails = playingAlbumDetails;
+    currentTracklist = playingTracklist;
+
+    renderTracklist(playingTracklist);
+    loadTrackLyrics(art, tr.title, alb, tr.duration);
   }
 
   if (hudLyricsBtn) {
@@ -1194,35 +1229,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
-
-  // Keyboard Shortcuts
-  document.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") {
-      if (e.key === "Escape") e.target.blur();
-      return;
-    }
-
-    if (e.code === "Space") {
-      e.preventDefault();
-      togglePlayPause();
-    } else if (e.key === "ArrowRight") {
-      if (e.ctrlKey) {
-        playNextTrack();
-      } else if (audio.duration) {
-        audio.currentTime = Math.min(audio.duration, audio.currentTime + 10);
-      }
-    } else if (e.key === "ArrowLeft") {
-      if (e.ctrlKey) {
-        playPrevTrack();
-      } else if (audio.duration) {
-        audio.currentTime = Math.max(0, audio.currentTime - 10);
-      }
-    } else if (e.key === "Escape") {
-      albumModal.classList.add("hidden");
-      settingsModal.classList.add("hidden");
-      queueDrawer.classList.add("hidden");
-    }
-  });
 
   // =========================================================================
   // 2. DISCOVERY & TIME MACHINE ERAS
@@ -2484,13 +2490,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
       isLibraryRadioMode = true;
       isFullAlbumMode = true;
-      currentAlbumDetails = {
+      playingAlbumDetails = {
         id: "library_dj_radio",
         title: "Library DJ Radio (All Albums)",
         artist: "Various Artists",
         cover_big: tracks[0].cover_big || tracks[0].cover_small || "",
         cover_small: tracks[0].cover_small || ""
       };
+      playingTracklist = tracks;
+      playingTrackIndex = 0;
+      currentAlbumDetails = playingAlbumDetails;
       currentTracklist = tracks;
       currentTrackIndex = 0;
 
@@ -2707,10 +2716,13 @@ document.addEventListener("DOMContentLoaded", () => {
       modalPaneTracks.classList.remove("hidden");
     } else if (tabName === "lyrics") {
       if (modalPaneLyrics) modalPaneLyrics.classList.remove("hidden");
-      if (currentTracklist && currentTrackIndex >= 0 && currentTracklist[currentTrackIndex]) {
-        const tr = currentTracklist[currentTrackIndex];
-        const art = tr.artist || (currentAlbumDetails && currentAlbumDetails.artist) || "";
-        const alb = currentAlbumDetails ? currentAlbumDetails.title : "";
+      const isPlayingThisAlbum = modalAlbumDetails && playingAlbumDetails && String(modalAlbumDetails.id) === String(playingAlbumDetails.id);
+      const tracksToUse = isPlayingThisAlbum ? playingTracklist : (modalTracklistData || currentTracklist);
+      const trIdx = (isPlayingThisAlbum && playingTrackIndex >= 0) ? playingTrackIndex : 0;
+      if (tracksToUse && tracksToUse.length > 0 && tracksToUse[trIdx]) {
+        const tr = tracksToUse[trIdx];
+        const art = tr.artist || (modalAlbumDetails && modalAlbumDetails.artist) || "";
+        const alb = tr.album || (modalAlbumDetails ? modalAlbumDetails.title : "");
         loadTrackLyrics(art, tr.title, alb, tr.duration);
       }
     } else if (tabName === "story") {
@@ -2729,13 +2741,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // =========================================================================
   // 7. ALBUM MODAL & METADATA LOADER
   // =========================================================================
-  // 7. ALBUM MODAL & METADATA LOADER
-  // =========================================================================
   function renderAlbumModalContent(data, albumId) {
+    modalAlbumDetails = data;
+    modalTracklistData = data.tracks || [];
     currentAlbumDetails = data;
-    currentTracklist = data.tracks || [];
-    isLibraryRadioMode = false;
-    if (navLibraryRadio) navLibraryRadio.classList.remove("active");
+    currentTracklist = modalTracklistData;
 
     modalCoverArt.onerror = () => { modalCoverArt.src = window.FALLBACK_COVER_SVG; };
     modalCoverArt.src = (data.cover_big || data.cover_small || "").trim() || window.FALLBACK_COVER_SVG;
@@ -2866,11 +2876,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function playTrack(track, index, list, isFullAlbum = false) {
+    isLibraryRadioMode = false;
+    if (navLibraryRadio) navLibraryRadio.classList.remove("active");
     if (list && list.length > 0) {
-      currentTracklist = list;
+      playingTracklist = list;
     }
     if (currentInspectAlbum) {
-      currentAlbumDetails = currentInspectAlbum;
+      playingAlbumDetails = currentInspectAlbum;
     }
     playTrackAtIndex(index, isFullAlbum, 0);
   }
@@ -3141,9 +3153,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // Rapid Hover-to-Audition Waveform Generator (SUPERPOWER 3)
   function renderTracklist(tracks) {
     modalTracklist.innerHTML = "";
+    const isModalPlayingThisAlbum = modalAlbumDetails && playingAlbumDetails && 
+      (String(modalAlbumDetails.id) === String(playingAlbumDetails.id) || 
+       (modalAlbumDetails.title && modalAlbumDetails.title.toLowerCase() === (playingAlbumDetails.title || "").toLowerCase()));
+
     tracks.forEach((track, idx) => {
       const row = document.createElement("div");
-      row.className = `track-row ${idx === currentTrackIndex ? 'playing' : ''}`;
+      row.className = `track-row ${(isModalPlayingThisAlbum && idx === playingTrackIndex) ? 'playing' : ''}`;
       row.title = "Click to stream full studio track";
 
       // 8 dynamic simulated waveform bars for hover scrubbing
@@ -3181,6 +3197,10 @@ document.addEventListener("DOMContentLoaded", () => {
       // Single click on track row plays full audio track
       row.addEventListener("click", (e) => {
         if (e.target.closest(".btn-lyrics-track") || e.target.closest(".btn-preview-track") || e.target.closest(".btn-dl-track") || e.target.closest(".track-audition-wrap")) return;
+        isLibraryRadioMode = false;
+        if (navLibraryRadio) navLibraryRadio.classList.remove("active");
+        playingTracklist = modalTracklistData;
+        playingAlbumDetails = modalAlbumDetails || currentAlbumDetails;
         playTrackAtIndex(idx, true);
       });
 
@@ -3192,6 +3212,10 @@ document.addEventListener("DOMContentLoaded", () => {
           const rect = waveScrub.getBoundingClientRect();
           const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
           const seekSec = Math.floor(pct * 28);
+          isLibraryRadioMode = false;
+          if (navLibraryRadio) navLibraryRadio.classList.remove("active");
+          playingTracklist = modalTracklistData;
+          playingAlbumDetails = modalAlbumDetails || currentAlbumDetails;
           playTrackAtIndex(idx, false, seekSec);
         });
       }
@@ -3201,11 +3225,9 @@ document.addEventListener("DOMContentLoaded", () => {
       if (lyricsBtn) {
         lyricsBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          currentTrackIndex = idx;
-          highlightActiveTrack();
           switchModalTab("lyrics");
-          const art = track.artist || (currentAlbumDetails && currentAlbumDetails.artist) || "";
-          const alb = currentAlbumDetails ? currentAlbumDetails.title : "";
+          const art = track.artist || (modalAlbumDetails && modalAlbumDetails.artist) || "";
+          const alb = track.album || (modalAlbumDetails ? modalAlbumDetails.title : "");
           loadTrackLyrics(art, track.title, alb, track.duration);
         });
       }
@@ -3215,6 +3237,10 @@ document.addEventListener("DOMContentLoaded", () => {
       if (prevBtn) {
         prevBtn.addEventListener("click", (e) => {
           e.stopPropagation();
+          isLibraryRadioMode = false;
+          if (navLibraryRadio) navLibraryRadio.classList.remove("active");
+          playingTracklist = modalTracklistData;
+          playingAlbumDetails = modalAlbumDetails || currentAlbumDetails;
           playTrackAtIndex(idx, false);
         });
       }
@@ -3253,18 +3279,26 @@ document.addEventListener("DOMContentLoaded", () => {
   if (modalLyricsHeaderBtn) {
     modalLyricsHeaderBtn.addEventListener("click", () => {
       switchModalTab("lyrics");
-      if (currentTracklist && currentTracklist.length > 0) {
-        const trIdx = currentTrackIndex >= 0 ? currentTrackIndex : 0;
-        const tr = currentTracklist[trIdx];
-        const art = tr.artist || (currentAlbumDetails && currentAlbumDetails.artist) || "";
-        const alb = currentAlbumDetails ? currentAlbumDetails.title : "";
+      const tracksToUse = modalTracklistData || currentTracklist || playingTracklist;
+      if (tracksToUse && tracksToUse.length > 0) {
+        const isModalPlayingThisAlbum = modalAlbumDetails && playingAlbumDetails && 
+          (String(modalAlbumDetails.id) === String(playingAlbumDetails.id) || 
+           (modalAlbumDetails.title && modalAlbumDetails.title.toLowerCase() === (playingAlbumDetails.title || "").toLowerCase()));
+        const trIdx = (isModalPlayingThisAlbum && playingTrackIndex >= 0) ? playingTrackIndex : 0;
+        const tr = tracksToUse[trIdx];
+        const art = tr.artist || (modalAlbumDetails && modalAlbumDetails.artist) || "";
+        const alb = tr.album || (modalAlbumDetails ? modalAlbumDetails.title : "");
         loadTrackLyrics(art, tr.title, alb, tr.duration);
       }
     });
   }
 
   modalPlayFullAlbumBtn.addEventListener("click", () => {
-    if (currentTracklist && currentTracklist.length > 0) {
+    if (modalTracklistData && modalTracklistData.length > 0) {
+      isLibraryRadioMode = false;
+      if (navLibraryRadio) navLibraryRadio.classList.remove("active");
+      playingTracklist = modalTracklistData;
+      playingAlbumDetails = modalAlbumDetails || currentAlbumDetails;
       albumModal.classList.add("hidden");
       playTrackAtIndex(0, true);
     }

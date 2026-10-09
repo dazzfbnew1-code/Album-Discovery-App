@@ -360,6 +360,12 @@ def get_local_album_details(folder_path: str) -> dict:
     audio_files = sorted([f for f in p.iterdir() if f.suffix.lower() in AUDIO_EXTS], key=lambda f: f.name)
     tracks = []
     
+    import urllib.parse
+    cov_file_str = resolve_local_album_cover(p)
+    cover_url = f"/api/local-file?path={urllib.parse.quote(cov_file_str)}" if cov_file_str else ""
+    art_name = p.parent.name if p.parent else "Various Artists"
+    alb_title = p.name
+
     for idx, f in enumerate(audio_files, 1):
         tr_title = f.stem
         # Strip leading numbers like "01 - " or "1. "
@@ -376,22 +382,21 @@ def get_local_album_details(folder_path: str) -> dict:
         except Exception:
             pass
 
+        stream_url = f"/api/local-file?path={urllib.parse.quote(str(f))}"
         tracks.append({
             "id": f"local_tr_{idx}",
             "track_position": idx,
             "title": tr_title,
-            "artist": p.parent.name if p.parent else "",
+            "artist": art_name,
+            "album": alb_title,
             "duration": duration,
-            "preview": "",
-            "local_path": str(f)
+            "preview": stream_url,
+            "stream_url": stream_url,
+            "local_path": str(f),
+            "cover_big": cover_url,
+            "cover_small": cover_url,
+            "is_local": True
         })
-
-    import urllib.parse
-    cov_file_str = resolve_local_album_cover(p)
-    cover_url = f"/api/local-file?path={urllib.parse.quote(cov_file_str)}" if cov_file_str else ""
-
-    art_name = p.parent.name if p.parent else "Various Artists"
-    alb_title = p.name
 
     # Discover Companion Masterpieces via related artist graph
     similar = []

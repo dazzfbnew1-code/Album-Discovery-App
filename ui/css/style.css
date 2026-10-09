@@ -2773,6 +2773,15 @@ body:has(#inspectDrawer:not(.hidden)) .player-dock-pill {
   box-shadow: 0 0 8px var(--accent);
 }
 
+#hudAlbumTitle {
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
+}
+
 .hud-quality-pill {
   font-size: 9.5px;
   font-weight: 800;
