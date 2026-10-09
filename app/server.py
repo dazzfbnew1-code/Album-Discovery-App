@@ -312,7 +312,9 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
             title = get1("title") or ""
             album = get1("album") or ""
             duration = int(get1("duration") or 0)
-            self._send_json(get_track_lyrics(artist, title, album, duration))
+            force_refresh = get1("force") == "1" or get1("refresh") == "1"
+            file_path = get1("file_path") or get1("path") or ""
+            self._send_json(get_track_lyrics(artist, title, album, duration, force_refresh=force_refresh, file_path=file_path))
 
         elif route == "local-file":
             file_path_str = get1("path") or ""

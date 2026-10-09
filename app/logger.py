@@ -46,6 +46,30 @@ _server_log = _create_category_logger("Server", "server.log")
 _error_log = _create_category_logger("Error", "errors.log")
 _discography_log = _create_category_logger("Discography", "discography.log")
 
+def sanitize_log_message(msg: str) -> str:
+    """Sanitizes text so Windows codepages and log files never corrupt symbols into o\" or ?T."""
+    if not isinstance(msg, str):
+        msg = str(msg)
+    replacements = {
+        "✓": "[OK]",
+        "✔": "[OK]",
+        "❌": "[FAIL]",
+        "✖": "[FAIL]",
+        "⚠️": "[WARN]",
+        "⚡": "[*]",
+        "’": "'",
+        "‘": "'",
+        "“": '"',
+        "”": '"',
+        "—": "-",
+        "–": "-",
+        "…": "...",
+    }
+    for orig, rep in replacements.items():
+        if orig in msg:
+            msg = msg.replace(orig, rep)
+    return msg.strip()
+
 import collections
 import threading
 import time
@@ -78,39 +102,43 @@ def get_recent_events(limit: int = 35) -> list:
         return list(_RECENT_EVENTS)[-limit:]
 
 def log_info(msg: str):
-    _app_log.info(msg)
-    add_event("APP", msg, "info")
+    clean = sanitize_log_message(msg)
+    _app_log.info(clean)
+    add_event("APP", clean, "info")
 
 def log_warn(msg: str):
-    _app_log.warning(msg)
-    _error_log.warning(msg)
-    add_event("WARN", msg, "warn")
+    clean = sanitize_log_message(msg)
+    _app_log.warning(clean)
+    _error_log.warning(clean)
+    add_event("WARN", clean, "warn")
 
 def log_error(msg: str):
-    _app_log.error(msg)
-    _error_log.error(msg)
-    add_event("ERROR", msg, "error")
+    clean = sanitize_log_message(msg)
+    _app_log.error(clean)
+    _error_log.error(clean)
+    add_event("ERROR", clean, "error")
 
 def log_search(msg: str):
-    _search_log.info(msg)
-    _app_log.info(f"[SEARCH] {msg}")
-    add_event("SEARCH", msg, "info")
+    clean = sanitize_log_message(msg)
+    _search_log.info(clean)
+    add_event("SEARCH", clean, "info")
 
 def log_discovery(msg: str):
-    _discovery_log.info(msg)
-    _app_log.info(f"[DISCOVERY] {msg}")
-    add_event("DISCOVERY", msg, "info")
+    clean = sanitize_log_message(msg)
+    _discovery_log.info(clean)
+    add_event("DISCOVERY", clean, "info")
 
 def log_discography(msg: str):
-    _discography_log.info(msg)
-    add_event("DISCOGRAPHY", msg, "info")
+    clean = sanitize_log_message(msg)
+    _discography_log.info(clean)
+    add_event("DISCOGRAPHY", clean, "info")
 
 def log_download(msg: str):
-    _download_log.info(msg)
-    _app_log.info(f"[DOWNLOAD] {msg}")
-    add_event("DOWNLOAD", msg, "info")
+    clean = sanitize_log_message(msg)
+    _download_log.info(clean)
+    add_event("DOWNLOAD", clean, "info")
 
 def log_server(msg: str):
-    _server_log.info(msg)
-    _app_log.info(msg)
-    add_event("SERVER", msg, "info")
+    clean = sanitize_log_message(msg)
+    _server_log.info(clean)
+    add_event("SERVER", clean, "info")

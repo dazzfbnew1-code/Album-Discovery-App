@@ -481,6 +481,21 @@ def save_cached_lyrics(artist: str, title: str, lyrics_data: dict):
         log_error(f"[DB ERROR] save_cached_lyrics failed for {cache_key}: {e}")
 
 
+def delete_cached_lyrics(artist: str, title: str):
+    """Delete a cached lyrics entry to force fresh fetch."""
+    import re
+    clean_art = re.sub(r"\(.*?\)|\[.*?\]", "", artist).strip().lower()
+    clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", title).strip().lower()
+    cache_key = f"{clean_art}:::{clean_tit}"
+    try:
+        with get_lyrics_conn() as conn:
+            c = conn.cursor()
+            c.execute("DELETE FROM cached_lyrics WHERE cache_key = ?", (cache_key,))
+            conn.commit()
+    except Exception as e:
+        log_error(f"[DB ERROR] delete_cached_lyrics failed for {cache_key}: {e}")
+
+
 def clear_downloads_history():
     """Clear all downloaded albums history records from music_library.db."""
     try:

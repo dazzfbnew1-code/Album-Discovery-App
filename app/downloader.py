@@ -325,8 +325,8 @@ class DownloadManager:
             except Exception as e:
                 job["status"] = "failed"
                 job["error"] = str(e)
-                log_error(f"[DOWNLOAD FAILED ❌] '{job['title']}' by {job['artist']}: {e}")
-                log_download(f"[DOWNLOAD FAILED ❌] '{job['title']}' by {job['artist']}: {e}")
+                log_error(f"[DOWNLOAD FAILED] '{job['title']}' by {job['artist']}: {e}")
+                log_download(f"[DOWNLOAD FAILED] '{job['title']}' by {job['artist']}: {e}")
 
             with self._lock:
                 self.history.append(job)
@@ -455,10 +455,10 @@ class DownloadManager:
                         cover_path=cov_to_embed,
                         lyrics=track_lyrics_text
                     )
-                    log_download(f"  [TRACK {idx}/{total} TAGGED ✓] ID3 tags, artwork & lyrics embedded in {out_filename}")
+                    log_download(f"  [TRACK {idx}/{total} TAGGED [OK]] ID3 tags, artwork & lyrics embedded in {out_filename}")
                 elif HAS_MUTAGEN and out_file.exists():
                     self._tag_audio_file(str(out_file), tr_title, tr_artist, album, tr_num, total, year, cov_to_embed or None, ext, lyrics=track_lyrics_text)
-                    log_download(f"  [TRACK {idx}/{total} TAGGED ✓] Audio tags written to {out_filename}")
+                    log_download(f"  [TRACK {idx}/{total} TAGGED [OK]] Audio tags written to {out_filename}")
 
                 with progress_lock:
                     completed_count += 1
@@ -466,7 +466,7 @@ class DownloadManager:
                     job["current_track_idx"] = idx
                     job["current_track_title"] = tr_title
                     job["progress_pct"] = int((completed_count / total) * 100) if total else 100
-                log_download(f"  [TRACK {idx}/{total} COMPLETE ✓] '{tr_title}' ({completed_count}/{total} done)")
+                log_download(f"  [TRACK {idx}/{total} COMPLETE [OK]] '{tr_title}' ({completed_count}/{total} done)")
             except Exception as tr_err:
                 log_warn(f"  [TRACK {idx}/{total} FAILED] '{tr_title}': {tr_err}")
                 with progress_lock:
@@ -502,7 +502,7 @@ class DownloadManager:
                 junk_file.unlink(missing_ok=True)
         except Exception:
             pass
-        log_download(f"  [ALBUM VERIFIED ✓] {verified_count}/{total} tracks verified intact on disk.")
+        log_download(f"  [ALBUM VERIFIED [OK]] {verified_count}/{total} tracks verified intact on disk.")
         if verified_count == 0:
             try:
                 if cover_path.exists():
@@ -783,7 +783,7 @@ class DownloadManager:
                         with yt_dlp.YoutubeDL(strat_opts) as ydl:
                             ydl.download([target])
                         if safe_out.exists() and safe_out.stat().st_size > 50000:
-                            log_download(f"    [TIER 2 SUCCESS ✓] Candidate '{cid}' downloaded via {strat_name}")
+                            log_download(f"    [TIER 2 SUCCESS [OK]] Candidate '{cid}' downloaded via {strat_name}")
                             return True, None
                     except Exception as t2_err:
                         last_candidate_err = t2_err
@@ -862,7 +862,7 @@ class DownloadManager:
             for cid in fallback_candidate_ids:
                 success, err = _attempt_candidate_download(cid)
                 if success and safe_out.exists() and safe_out.stat().st_size > 50000:
-                    log_download(f"  [FALLBACK SUCCESS ✓] Successfully recovered and downloaded '{title}' using fallback '{primary_art} - {core_title}'")
+                    log_download(f"  [FALLBACK SUCCESS [OK]] Successfully recovered and downloaded '{title}' using fallback '{primary_art} - {core_title}'")
                     return
                 last_err = err
                 log_download(f"    [FALLBACK CANDIDATE RETRY] Candidate '{cid}' failed. Trying next fallback candidate...")

@@ -168,8 +168,6 @@
   if (librarySearchInput) {
     librarySearchInput.addEventListener("input", (e) => {
       const v = e.target.value;
-      const omni = document.getElementById("omniSearchInput");
-      if (omni) omni.value = v;
       filterLocalLibraryUI(v);
     });
   }
@@ -177,8 +175,6 @@
   if (librarySearchClearBtn) {
     librarySearchClearBtn.addEventListener("click", () => {
       if (librarySearchInput) librarySearchInput.value = "";
-      const omni = document.getElementById("omniSearchInput");
-      if (omni) omni.value = "";
       filterLocalLibraryUI("");
       if (librarySearchInput) librarySearchInput.focus();
     });

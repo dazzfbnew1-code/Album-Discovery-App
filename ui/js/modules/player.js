@@ -180,64 +180,138 @@
     }
   }
 
+  let lastLyricsTrack = null;
+
   function parseLrc(lrcText) {
     if (!lrcText) return [];
-    const lines = lrcText.split("\n");
+    const rawLines = lrcText.split(/\r?\n/);
     const result = [];
-    const timeReg = /\[(\d{2}):(\d{2})\.(\d{2,3})\]/;
-    for (const line of lines) {
-      const match = timeReg.exec(line);
-      if (match) {
+    const timeTagReg = /\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+
+    for (const rawLine of rawLines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) continue;
+
+      const timestamps = [];
+      let match;
+      timeTagReg.lastIndex = 0;
+
+      while ((match = timeTagReg.exec(trimmed)) !== null) {
         const min = parseInt(match[1], 10);
         const sec = parseInt(match[2], 10);
-        const ms = parseFloat("0." + match[3]);
-        const time = min * 60 + sec + ms;
-        const text = line.replace(timeReg, "").trim();
-        if (text) {
-          result.push({ time, text });
+        const msStr = match[3] || "0";
+        const ms = parseFloat("0." + msStr.padEnd(3, "0"));
+        timestamps.push(min * 60 + sec + ms);
+      }
+
+      if (timestamps.length > 0) {
+        const cleanText = trimmed.replace(timeTagReg, "").trim();
+        for (const t of timestamps) {
+          if (cleanText) {
+            result.push({ time: t, text: cleanText, isBreak: false });
+          } else {
+            result.push({ time: t, text: "♪", isBreak: true });
+          }
         }
       }
     }
+
+    result.sort((a, b) => a.time - b.time);
     return result;
   }
 
-  async function loadTrackLyrics(artist, title, album = "", duration = 0) {
+  async function loadTrackLyrics(artist, title, album = "", duration = 0, force = false, filePath = "") {
     if (!lyricsTrackTitle || !modalLyricsBody) return;
+    lastLyricsTrack = { artist, title, album, duration, filePath };
+
     lyricsTrackTitle.textContent = `${artist} — ${title}`;
-    modalLyricsBody.innerHTML = "<div class='lyrics-placeholder'>Fetching verified lyrics...</div>";
+    modalLyricsBody.innerHTML = "<div class='lyrics-placeholder'><div class='lyrics-spin-icon'>⏳</div> Fetching verified lyrics...</div>";
     
     try {
-      const url = `/api/lyrics?artist=${encodeURIComponent(artist)}&title=${encodeURIComponent(title)}&album=${encodeURIComponent(album)}&duration=${encodeURIComponent(duration)}`;
-      const res = await fetch(url);
+      const qParams = new URLSearchParams({
+        artist: artist || "",
+        title: title || "",
+        album: album || "",
+        duration: duration || 0,
+        force: force ? "1" : "0",
+        path: filePath || ""
+      });
+
+      const res = await fetch(`/api/lyrics?${qParams.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       currentLyrics = data;
 
-      if (data.synced) {
-        parsedSyncedLyrics = parseLrc(data.synced);
-        modalLyricsBody.innerHTML = parsedSyncedLyrics.map((line, idx) => `
-          <div class="synced-line" data-idx="${idx}" data-time="${line.time}">${line.text}</div>
-        `).join("");
-
-        modalLyricsBody.querySelectorAll(".synced-line").forEach(el => {
-          el.addEventListener("click", () => {
-            const t = parseFloat(el.getAttribute("data-time"));
-            if (!isNaN(t)) {
-              cancelCrossfade();
-              activeDeck.currentTime = t;
-              if (activeDeck.paused) activeDeck.play();
-            }
-          });
-        });
-      } else if (data.plain) {
+      if (data.instrumental) {
         parsedSyncedLyrics = [];
-        modalLyricsBody.textContent = data.plain;
+        modalLyricsBody.innerHTML = `
+          <div class="lyrics-placeholder instrumental-card">
+            <span style="font-size: 28px; display: block; margin-bottom: 8px;">🎷</span>
+            <strong>Verified Instrumental Track</strong>
+            <p style="margin-top: 6px; font-size: 13px; color: var(--text-muted);">This recording contains no vocal lyrics.</p>
+          </div>`;
+      } else if (data.synced && data.synced.trim()) {
+        parsedSyncedLyrics = parseLrc(data.synced);
+        if (parsedSyncedLyrics.length > 0) {
+          modalLyricsBody.innerHTML = parsedSyncedLyrics.map((line, idx) => `
+            <div class="synced-line ${line.isBreak ? 'synced-break' : ''}" data-idx="${idx}" data-time="${line.time}">${Bus.escapeHtml(line.text)}</div>
+          `).join("");
+
+          modalLyricsBody.querySelectorAll(".synced-line").forEach(el => {
+            el.addEventListener("click", () => {
+              const t = parseFloat(el.getAttribute("data-time"));
+              if (!isNaN(t)) {
+                cancelCrossfade();
+                activeDeck.currentTime = t;
+                if (activeDeck.paused) activeDeck.play();
+              }
+            });
+          });
+        } else if (data.plain) {
+          renderPlainLyrics(data.plain);
+        } else {
+          showEmptyLyrics();
+        }
+      } else if (data.plain && data.plain.trim()) {
+        parsedSyncedLyrics = [];
+        renderPlainLyrics(data.plain);
       } else {
         parsedSyncedLyrics = [];
-        modalLyricsBody.innerHTML = "<div class='lyrics-placeholder'>No lyrics found for this track.</div>";
+        showEmptyLyrics();
       }
     } catch (e) {
-      modalLyricsBody.innerHTML = "<div class='lyrics-placeholder'>Failed to load lyrics.</div>";
+      parsedSyncedLyrics = [];
+      modalLyricsBody.innerHTML = `
+        <div class="lyrics-placeholder error-lyrics">
+          <p>⚠️ Unable to load lyrics right now.</p>
+          <button class="btn-retry-inline" id="btnRetryLyricsInline" style="margin-top: 10px;">Retry</button>
+        </div>`;
+      const retryBtn = document.getElementById("btnRetryLyricsInline");
+      if (retryBtn) {
+        retryBtn.addEventListener("click", () => loadTrackLyrics(artist, title, album, duration, true, filePath));
+      }
     }
+  }
+
+  function renderPlainLyrics(plainText) {
+    if (!modalLyricsBody) return;
+    const verses = plainText.split(/\r?\n\r?\n+/);
+    modalLyricsBody.innerHTML = `
+      <div class="plain-lyrics-container">
+        ${verses.map(verse => {
+          const lines = verse.split(/\r?\n/);
+          return `<div class="lyrics-verse">${lines.map(l => `<p class="lyrics-line">${Bus.escapeHtml(l)}</p>`).join("")}</div>`;
+        }).join("")}
+      </div>`;
+  }
+
+  function showEmptyLyrics() {
+    if (!modalLyricsBody) return;
+    modalLyricsBody.innerHTML = `
+      <div class="lyrics-placeholder">
+        <p>No verified lyrics found for this track.</p>
+        <p style="font-size: 12px; margin-top: 6px; color: var(--text-muted);">Try clicking "Reload Lyrics" above to retry cloud resolution.</p>
+      </div>`;
   }
 
   function syncLyricsToTime(curTime) {
@@ -250,10 +324,18 @@
           break;
         }
       }
+
+      const lines = modalLyricsBody.querySelectorAll(".synced-line");
       if (activeIdx >= 0) {
-        const lines = modalLyricsBody.querySelectorAll(".synced-line");
+        const activeItem = parsedSyncedLyrics[activeIdx];
+        const nextItem = parsedSyncedLyrics[activeIdx + 1];
+
+        // De-emphasize active highlight if this line finished or is an instrumental break
+        const lineDuration = nextItem ? (nextItem.time - activeItem.time) : 8.0;
+        const isFarPast = (curTime - activeItem.time) > Math.min(lineDuration, 9.0);
+
         lines.forEach((l, idx) => {
-          if (idx === activeIdx) {
+          if (idx === activeIdx && !isFarPast && !activeItem.isBreak) {
             if (!l.classList.contains("active")) {
               l.classList.add("active");
               l.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -262,6 +344,8 @@
             l.classList.remove("active");
           }
         });
+      } else {
+        lines.forEach(l => l.classList.remove("active"));
       }
     }
   }
@@ -326,7 +410,8 @@
 
     highlightActiveTrack();
     updateMediaSession(track, artist, albumTitle, coverArt);
-    loadTrackLyrics(artist, track.title, albumTitle, track.duration);
+    const localPath = track.local_path || (track.stream_url && track.stream_url.includes("local?path=") ? decodeURIComponent(track.stream_url.split("local?path=")[1]) : "");
+    loadTrackLyrics(artist, track.title, albumTitle, track.duration, false, localPath);
 
     if (Bus.state.config && Bus.state.config.show_track_toasts !== false && !isLibraryRadioMode) {
       Bus.showToast(`▶ Now Playing: "${track.title}" • ${artist}`, "info");
@@ -862,7 +947,28 @@
     if (modalTypeBadge) modalTypeBadge.textContent = isLibraryRadioMode ? "LIBRARY DJ RADIO" : "STUDIO ALBUM";
 
     if (window.AppDiscovery) window.AppDiscovery.renderTracklist(playingTracklist);
-    loadTrackLyrics(art, tr.title, alb, tr.duration);
+    const localPath = tr.local_path || (tr.stream_url && tr.stream_url.includes("local?path=") ? decodeURIComponent(tr.stream_url.split("local?path=")[1]) : "");
+    loadTrackLyrics(art, tr.title, alb, tr.duration, false, localPath);
+  }
+
+  if (btnRefreshLyrics) {
+    btnRefreshLyrics.addEventListener("click", () => {
+      if (lastLyricsTrack && lastLyricsTrack.title) {
+        btnRefreshLyrics.textContent = "⏳ Reloading...";
+        btnRefreshLyrics.disabled = true;
+        loadTrackLyrics(
+          lastLyricsTrack.artist,
+          lastLyricsTrack.title,
+          lastLyricsTrack.album,
+          lastLyricsTrack.duration,
+          true,
+          lastLyricsTrack.filePath
+        ).finally(() => {
+          btnRefreshLyrics.textContent = "🔄 Reload Lyrics";
+          btnRefreshLyrics.disabled = false;
+        });
+      }
+    });
   }
 
   if (hudLyricsBtn) hudLyricsBtn.addEventListener("click", openLyricsForCurrentTrack);
