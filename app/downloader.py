@@ -49,9 +49,6 @@ except Exception:
     HAS_MUTAGEN = False
 
 FORMAT_SPECS = {
-    "flac": {"codec": "flac", "quality": None, "ext": "flac"},
-    "alac": {"codec": "alac", "quality": None, "ext": "m4a"},
-    "wav":  {"codec": "wav",  "quality": None, "ext": "wav"},
     "320k": {"codec": "mp3",  "quality": "320", "ext": "mp3"},
     "256k": {"codec": "mp3",  "quality": "256", "ext": "mp3"},
     "192k": {"codec": "mp3",  "quality": "192", "ext": "mp3"},
