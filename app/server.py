@@ -88,42 +88,52 @@ def resolve_full_audio_stream(artist: str, title: str) -> dict:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
-            "skip_download": True,
-            "extractor_args": {
-                "youtube": {
-                    "player_client": ["android", "ios"]
-                }
-            }
+            "skip_download": True
         }
         cookies_file = Path(__file__).parent.parent / "data" / "cookies.txt"
+        
+        stream_configs = []
         if cookies_file.exists():
-            stream_opts["cookiefile"] = str(cookies_file)
-            search_opts["cookiefile"] = str(cookies_file)
+            opts_cf = dict(stream_opts)
+            opts_cf["cookiefile"] = str(cookies_file)
+            stream_configs.append(opts_cf)
 
-        with yt_dlp.YoutubeDL(stream_opts) as stream_ydl:
-            for cid in candidate_ids:
-                target = f"https://www.youtube.com/watch?v={cid}" if not cid.startswith("ytsearch") else cid
-                try:
-                    info = stream_ydl.extract_info(target, download=False)
-                    if info:
-                        url = info.get("url")
-                        if url:
-                            duration = info.get("duration", 0)
-                            if len(STREAM_URL_CACHE) > 150:
-                                now_t = time.time()
-                                for ek in [k for k, v in STREAM_URL_CACHE.items() if now_t - v.get("resolved_at", 0) > 1800]:
-                                    STREAM_URL_CACHE.pop(ek, None)
-                                if len(STREAM_URL_CACHE) > 200:
-                                    for ek in sorted(STREAM_URL_CACHE.keys(), key=lambda x: STREAM_URL_CACHE[x].get("resolved_at", 0))[:50]:
-                                        STREAM_URL_CACHE.pop(ek, None)
-                            STREAM_URL_CACHE[cache_key] = {
-                                "url": url,
-                                "duration": duration,
-                                "resolved_at": time.time()
-                            }
-                            return {"stream_url": url, "duration": duration, "cached": False}
-                except Exception:
-                    continue
+        opts_ff = dict(stream_opts)
+        opts_ff["cookiesfrombrowser"] = ("firefox",)
+        stream_configs.append(opts_ff)
+
+        opts_mobile = dict(stream_opts)
+        opts_mobile["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
+        stream_configs.append(opts_mobile)
+
+        for cfg in stream_configs:
+            try:
+                with yt_dlp.YoutubeDL(cfg) as stream_ydl:
+                    for cid in candidate_ids:
+                        target = f"https://www.youtube.com/watch?v={cid}" if not cid.startswith("ytsearch") else cid
+                        try:
+                            info = stream_ydl.extract_info(target, download=False)
+                            if info:
+                                url = info.get("url")
+                                if url:
+                                    duration = info.get("duration", 0)
+                                    if len(STREAM_URL_CACHE) > 150:
+                                        now_t = time.time()
+                                        for ek in [k for k, v in STREAM_URL_CACHE.items() if now_t - v.get("resolved_at", 0) > 1800]:
+                                            STREAM_URL_CACHE.pop(ek, None)
+                                        if len(STREAM_URL_CACHE) > 200:
+                                            for ek in sorted(STREAM_URL_CACHE.keys(), key=lambda x: STREAM_URL_CACHE[x].get("resolved_at", 0))[:50]:
+                                                STREAM_URL_CACHE.pop(ek, None)
+                                    STREAM_URL_CACHE[cache_key] = {
+                                        "url": url,
+                                        "duration": duration,
+                                        "resolved_at": time.time()
+                                    }
+                                    return {"stream_url": url, "duration": duration, "cached": False}
+                        except Exception:
+                            continue
+            except Exception:
+                continue
 
     except Exception as e:
         log_error(f"[STREAM RESOLVER ERROR] {e}")
