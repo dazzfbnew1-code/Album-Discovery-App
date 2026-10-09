@@ -25,8 +25,6 @@ except Exception:
 EasyID3 = None
 ID3 = None
 APIC = None
-FLAC = None
-Picture = None
 MP4 = None
 MP4Cover = None
 OggVorbis = None
@@ -37,8 +35,6 @@ try:
     mutagen_id3 = importlib.import_module("mutagen.id3")
     ID3 = mutagen_id3.ID3
     APIC = mutagen_id3.APIC
-    FLAC = importlib.import_module("mutagen.flac").FLAC
-    Picture = importlib.import_module("mutagen.flac").Picture
     mutagen_mp4 = importlib.import_module("mutagen.mp4")
     MP4 = mutagen_mp4.MP4
     MP4Cover = mutagen_mp4.MP4Cover
@@ -818,23 +814,7 @@ class DownloadManager:
 
     def _tag_audio_file(self, file_path: str, title: str, artist: str, album: str, track_no: int, total_tracks: int, year: str, cover_path: str = None, ext: str = "mp3"):
         try:
-            if ext == "flac" and FLAC:
-                audio = FLAC(file_path)
-                audio["title"] = title
-                audio["artist"] = artist
-                audio["albumartist"] = artist
-                audio["album"] = album
-                audio["tracknumber"] = f"{track_no}/{total_tracks}"
-                if year: audio["date"] = str(year)
-                if cover_path and Path(cover_path).exists() and Picture:
-                    img = Picture()
-                    img.type = 3
-                    img.mime = "image/jpeg"
-                    with open(cover_path, "rb") as f: img.data = f.read()
-                    audio.add_picture(img)
-                audio.save()
-
-            elif ext == "m4a" and MP4:
+            if ext == "m4a" and MP4:
                 audio = MP4(file_path)
                 audio["\xa9nam"] = [title]
                 audio["\xa9ART"] = [artist]
