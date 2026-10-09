@@ -455,8 +455,15 @@ class DownloadManager:
                 junk_file.unlink(missing_ok=True)
         except Exception:
             pass
-
         log_download(f"  [ALBUM VERIFIED ✓] {verified_count}/{total} tracks verified intact on disk.")
+        if verified_count == 0:
+            try:
+                if cover_path.exists():
+                    cover_path.unlink(missing_ok=True)
+                album_dir.rmdir()
+            except Exception:
+                pass
+            raise RuntimeError(f"0/{total} tracks could be downloaded")
 
     def _make_progress_hook(self, job: dict, track_idx: int, tr_title: str):
         def hook(d):
