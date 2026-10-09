@@ -1,6 +1,14 @@
-$appDir = $PSScriptRoot
-if (-not $appDir) { $appDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
-if (-not $appDir) { $appDir = (Get-Location).Path }
+$scriptDir = $PSScriptRoot
+if (-not $scriptDir) { $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path }
+if (-not $scriptDir) { $scriptDir = (Get-Location).Path }
+
+if (Test-Path (Join-Path (Split-Path -Parent $scriptDir) "START.bat")) {
+    $appDir = Split-Path -Parent $scriptDir
+} elseif (Test-Path (Join-Path $scriptDir "START.bat")) {
+    $appDir = $scriptDir
+} else {
+    $appDir = (Get-Location).Path
+}
 
 $iconFile = Join-Path $appDir "ui\app_icon.ico"
 if (-not (Test-Path $iconFile)) {

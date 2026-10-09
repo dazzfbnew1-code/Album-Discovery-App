@@ -33,7 +33,7 @@ if %errorlevel% equ 0 (
 )
 
 :: 2. Ensure Desktop & App Shortcuts with Custom Icon exist
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0update_lnk.ps1" >nul 2>nul
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\update_lnk.ps1" >nul 2>nul
 
 :: 3. Launch in Windowless GUI Mode (No persistent console window)
 where pyw >nul 2>nul

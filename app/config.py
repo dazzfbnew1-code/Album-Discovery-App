@@ -8,7 +8,6 @@ CONFIG_FILE = DATA_DIR / "config.json"
 
 # Default download folder is a dedicated 'Album Downloads' folder inside the app directory
 DEFAULT_DOWNLOAD_DIR = str(APP_ROOT / "Album Downloads")
-Path(DEFAULT_DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
 import shutil
 
@@ -64,9 +63,20 @@ def load_config() -> dict:
                 if not cfg.get("download_root"):
                     cfg["download_root"] = single_root
 
+                # Only ensure DEFAULT_DOWNLOAD_DIR exists on disk if it is actively selected
+                if cfg.get("download_root") == DEFAULT_DOWNLOAD_DIR or single_root == DEFAULT_DOWNLOAD_DIR:
+                    try:
+                        Path(DEFAULT_DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
+                    except Exception:
+                        pass
+
                 return cfg
         except Exception:
             pass
+    try:
+        Path(DEFAULT_DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
     return DEFAULT_CONFIG.copy()
 
 CONFIG = load_config()
@@ -135,6 +145,12 @@ def save_config(new_config: dict) -> dict:
 
     if not CONFIG.get("download_root"):
         CONFIG["download_root"] = CONFIG.get("music_root", DEFAULT_DOWNLOAD_DIR)
+
+    if CONFIG.get("download_root") == DEFAULT_DOWNLOAD_DIR:
+        try:
+            Path(DEFAULT_DOWNLOAD_DIR).mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
 
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(CONFIG, f, indent=2)

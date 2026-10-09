@@ -43,9 +43,8 @@ desktop.ini
 data/config.json
 data/cookies.txt
 AGENTS.md
-PUSH_TO_GITHUB.bat
-PROMOTE_TO_STABLE.bat
-promote_stable.py
-scripts/
+scripts/PUSH_TO_GITHUB.bat
+scripts/PROMOTE_TO_STABLE.bat
+scripts/promote_stable.py
+scripts/HOW_UPDATES_WORK.txt
 ui/js/modules/
-HOW_UPDATES_WORK.txt
