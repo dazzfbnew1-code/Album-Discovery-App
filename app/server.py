@@ -267,6 +267,9 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
                 "cookie_notice": DOWNLOAD_MANAGER.cookie_notice
             })
 
+        elif route in ["system/status", "status"]:
+            self._send_json({"status": "ok", "app": "Album Discovery App"})
+
         elif route == "monitor/stats":
             self._send_json(get_system_stats())
 
