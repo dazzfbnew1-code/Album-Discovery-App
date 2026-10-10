@@ -25,6 +25,7 @@ def ensure_dependencies():
         "yt_dlp": "yt-dlp>=2026.08.19",
         "imageio_ffmpeg": "imageio-ffmpeg>=0.4.8",
         "psutil": "psutil>=5.9.0",
+        "webview": "pywebview>=4.0.0",
     }
     missing = []
     for mod, pkg in required.items():
@@ -111,24 +112,55 @@ def is_server_alive(port: int = 8779) -> bool:
         return False
 
 
-def open_desktop_window(app_url: str):
-    """Launches the app in a dedicated, borderless app window."""
-    app_exe = get_browser_app_executable()
-    if app_exe:
-        import subprocess
-        # Native Edge/Chrome App Mode: zero browser chrome, instant startup, full WebAudio
-        proc = subprocess.Popen([app_exe, f"--app={app_url}", "--window-size=1440,900"])
-        try:
-            proc.wait()
-        except KeyboardInterrupt:
-            pass
-        return True
+def wait_for_server(port: int, max_retries: int = 40) -> bool:
+    """Blocks until the HTTP server is responsive."""
+    for _ in range(max_retries):
+        if is_server_alive(port):
+            return True
+        time.sleep(0.05)
+    return False
 
-    # Fallback 1: pywebview if available
+
+def launch_gui(app_url: str):
+    """Launches native pywebview desktop window with fallbacks, keeping server alive."""
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    icon_path = os.path.join(root_dir, "ui", "app_icon.ico")
+    if not os.path.exists(icon_path):
+        icon_path = os.path.join(root_dir, "ui", "favicon.ico")
+        if not os.path.exists(icon_path):
+            icon_path = None
+
+    def apply_win32_window_icon(window_title: str, ico: str):
+        if os.name != "nt" or not ico or not os.path.exists(ico):
+            return
+        try:
+            user32 = ctypes.windll.user32
+            IMAGE_ICON = 1
+            LR_LOADFROMFILE = 0x00000010
+            LR_DEFAULTSIZE = 0x00000040
+            WM_SETICON = 0x0080
+            ICON_SMALL = 0
+            ICON_BIG = 1
+            for _ in range(50):
+                hwnd = user32.FindWindowW(None, window_title)
+                if hwnd:
+                    h_big = user32.LoadImageW(None, ico, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE)
+                    h_sm = user32.LoadImageW(None, ico, IMAGE_ICON, 16, 16, LR_LOADFROMFILE)
+                    if h_big:
+                        user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, h_big)
+                    if h_sm:
+                        user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, h_sm)
+                    break
+                time.sleep(0.1)
+        except Exception:
+            pass
+
+    gui_launched = False
     if webview:
         try:
-            webview.create_window(
-                title=APP_WINDOW_TITLE,
+            win_title = APP_WINDOW_TITLE
+            window = webview.create_window(
+                title=win_title,
                 url=app_url,
                 width=1440,
                 height=900,
@@ -139,27 +171,42 @@ def open_desktop_window(app_url: str):
                 text_select=False,
                 confirm_close=False
             )
-            webview.start(debug=False)
-            return True
+            if icon_path:
+                threading.Thread(target=apply_win32_window_icon, args=(win_title, icon_path), daemon=True).start()
+            webview.start(icon=icon_path, debug=False)
+            gui_launched = True
+            return
         except Exception:
-            pass
+            gui_launched = False
+
+    # Fallback 1: Edge / Chrome App Mode
+    app_exe = get_browser_app_executable()
+    if app_exe:
+        try:
+            import subprocess
+            subprocess.Popen([app_exe, f"--app={app_url}", "--window-size=1440,900"])
+            gui_launched = True
+        except Exception:
+            gui_launched = False
 
     # Fallback 2: Default web browser
-    import webbrowser
-    webbrowser.open(app_url)
+    if not gui_launched:
+        import webbrowser
+        webbrowser.open(app_url)
+
+    # In browser / app mode fallback, keep Python server alive until interrupted
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         pass
-    return True
 
 
 def main():
     # If the server is already running in background, focus window or open UI immediately
     if is_server_alive(8779):
         if not focus_existing_instance(APP_WINDOW_TITLE):
-            open_desktop_window("http://127.0.0.1:8779/index.html")
+            launch_gui("http://127.0.0.1:8779/index.html")
         sys.exit(0)
 
     if focus_existing_instance(APP_WINDOW_TITLE):
@@ -180,11 +227,13 @@ def main():
     )
     server_thread.start()
 
-    time.sleep(0.4)
+    # Ensure server is fully responsive before displaying GUI
+    wait_for_server(port)
+
     app_url = f"http://127.0.0.1:{port}/index.html"
 
     try:
-        open_desktop_window(app_url)
+        launch_gui(app_url)
     finally:
         from app.system import cleanup_system_resources
         cleanup_system_resources()

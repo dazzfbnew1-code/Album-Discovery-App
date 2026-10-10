@@ -58,7 +58,7 @@ if not defined PY_CMD (
 )
 
 :: 1. Verify dependencies first
-"%PY_CMD%" -c "import mutagen, yt_dlp, requests, imageio_ffmpeg, psutil" >nul 2>nul
+"%PY_CMD%" -c "import mutagen, yt_dlp, requests, imageio_ffmpeg, psutil, webview" >nul 2>nul
 if errorlevel 1 (
     echo [SETUP] Installing required modules for first run...
     "%PY_CMD%" -m pip install -r "%~dp0requirements.txt"
