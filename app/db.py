@@ -459,7 +459,6 @@ def save_cached_lyrics(artist: str, title: str, lyrics_data: dict):
     """Save synchronized lyrics to dedicated lyrics.db so subsequent plays load offline in 0ms."""
     if not lyrics_data or not (lyrics_data.get("synced") or lyrics_data.get("plain")):
         return
-    import re
     clean_art = re.sub(r"\(.*?\)|\[.*?\]", "", artist).strip().lower()
     clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", title).strip().lower()
     cache_key = f"{clean_art}:::{clean_tit}"
@@ -484,7 +483,6 @@ def save_cached_lyrics(artist: str, title: str, lyrics_data: dict):
 
 def delete_cached_lyrics(artist: str, title: str):
     """Delete a cached lyrics entry to force fresh fetch."""
-    import re
     clean_art = re.sub(r"\(.*?\)|\[.*?\]", "", artist).strip().lower()
     clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", title).strip().lower()
     cache_key = f"{clean_art}:::{clean_tit}"
