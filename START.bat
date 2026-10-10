@@ -26,7 +26,7 @@ if %errorlevel% equ 0 (
 :: 1. Verify dependencies first
 where py >nul 2>nul
 if %errorlevel% equ 0 (
-    py -c "import webview, mutagen, yt_dlp, requests, imageio_ffmpeg" >nul 2>nul
+    py -c "import mutagen, yt_dlp, requests, imageio_ffmpeg" >nul 2>nul
     if errorlevel 1 (
         echo [SETUP] Installing required modules for first run...
         py -m pip install -r requirements.txt
@@ -39,7 +39,7 @@ if %errorlevel% equ 0 (
 ) else (
     where python >nul 2>nul
     if %errorlevel% equ 0 (
-        python -c "import webview, mutagen, yt_dlp, requests, imageio_ffmpeg" >nul 2>nul
+        python -c "import mutagen, yt_dlp, requests, imageio_ffmpeg" >nul 2>nul
         if errorlevel 1 (
             echo [SETUP] Installing required modules for first run...
             python -m pip install -r requirements.txt
@@ -52,19 +52,21 @@ if %errorlevel% equ 0 (
     )
 )
 
-:: 2. Silently check for updates from GitHub (Dad release mode)
+:: 2. Check for updates in background (never delays startup)
 where py >nul 2>nul
 if %errorlevel% equ 0 (
-    py "%~dp0scripts\check_update.py" >nul 2>nul
+    start "" /b py "%~dp0scripts\check_update.py" >nul 2>nul
 ) else (
     where python >nul 2>nul
     if %errorlevel% equ 0 (
-        python "%~dp0scripts\check_update.py" >nul 2>nul
+        start "" /b python "%~dp0scripts\check_update.py" >nul 2>nul
     )
 )
 
-:: 3. Ensure Desktop & App Shortcuts with Custom Icon exist
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\update_lnk.ps1" >nul 2>nul
+:: 3. Create Desktop shortcut once on first run
+if not exist "%userprofile%\Desktop\Album Discovery App.lnk" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\update_lnk.ps1" >nul 2>nul
+)
 
 :: 4. Launch in Windowless GUI Mode (No persistent console window)
 where pyw >nul 2>nul
@@ -81,13 +83,13 @@ if %errorlevel% equ 0 (
 
 where py >nul 2>nul
 if %errorlevel% equ 0 (
-    start "" py -u main.py
+    start "" py -3 main.py
     exit /b 0
 )
 
 where python >nul 2>nul
 if %errorlevel% equ 0 (
-    start "" python -u main.py
+    start "" python main.py
     exit /b 0
 )
 

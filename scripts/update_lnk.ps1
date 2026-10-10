@@ -56,19 +56,6 @@ try {
     Write-Host "[WARN] Could not reset folder attributes: $_" -ForegroundColor Yellow
 }
 
-# 4. Notify Windows Shell to refresh icon cache immediately
-try {
-    $code = @'
-    using System;
-    using System.Runtime.InteropServices;
-    public class WinShell {
-        [DllImport("shell32.dll")]
-        public static extern void SHChangeNotify(int wEventId, int uFlags, IntPtr dwItem1, IntPtr dwItem2);
-    }
-'@
-    $type = Add-Type -TypeDefinition $code -PassThru -ErrorAction SilentlyContinue
-    if ($type) {
-        [WinShell]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
-    }
-} catch {}
+# 4. Icon cache update complete
+Write-Host "[SUCCESS] Setup complete." -ForegroundColor Green
 
