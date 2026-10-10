@@ -53,7 +53,8 @@ FORMAT_SPECS = {
     "m4a":  {"codec": "m4a",  "quality": "256", "ext": "m4a"},
     "ogg320": {"codec": "vorbis", "quality": "320", "ext": "ogg"},
     "opus160": {"codec": "opus", "quality": "160", "ext": "opus"},
-    "opus": {"codec": "opus", "quality": "160", "ext": "opus"}
+    "opus": {"codec": "opus", "quality": "160", "ext": "opus"},
+    "flac": {"codec": "flac", "quality": "0", "ext": "flac"}
 }
 
 
