@@ -48,15 +48,8 @@ FORMAT_SPECS = {
     "320k": {"codec": "mp3",  "quality": "320", "ext": "mp3"},
     "256k": {"codec": "mp3",  "quality": "256", "ext": "mp3"},
     "192k": {"codec": "mp3",  "quality": "192", "ext": "mp3"},
-    "128k": {"codec": "mp3",  "quality": "128", "ext": "mp3"},
-    "aac256": {"codec": "m4a", "quality": "256", "ext": "m4a"},
-    "m4a":  {"codec": "m4a",  "quality": "256", "ext": "m4a"},
-    "ogg320": {"codec": "vorbis", "quality": "320", "ext": "ogg"},
-    "opus160": {"codec": "opus", "quality": "160", "ext": "opus"},
-    "opus": {"codec": "opus", "quality": "160", "ext": "opus"},
-    "flac": {"codec": "flac", "quality": "0", "ext": "flac"}
+    "128k": {"codec": "mp3",  "quality": "128", "ext": "mp3"}
 }
-
 
 
 def get_ffmpeg_path() -> str | None:
