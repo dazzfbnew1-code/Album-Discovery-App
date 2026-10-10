@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import sqlite3
 from pathlib import Path
@@ -430,12 +431,16 @@ def save_cached_musicbrainz(cache_key: str, data: dict):
         log_error(f"[DB ERROR] save_cached_musicbrainz failed for {cache_key}: {e}")
 
 
+def _make_lyrics_key(artist: str, title: str) -> str:
+    """Canonical cache key for lyrics lookups."""
+    clean_art = re.sub(r"\(.*?\)|\[.*?\]", "", str(artist or "")).strip().lower()
+    clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", str(title or "")).strip().lower()
+    return f"{clean_art}:::{clean_tit}"
+
+
 def get_cached_lyrics(artist: str, title: str) -> dict:
     """Retrieve cached lyrics from dedicated lyrics.db by normalized artist and title."""
-    import re
-    clean_art = re.sub(r"\(.*?\)|\[.*?\]", "", artist).strip().lower()
-    clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", title).strip().lower()
-    cache_key = f"{clean_art}:::{clean_tit}"
+    cache_key = _make_lyrics_key(artist, title)
     try:
         with get_lyrics_conn() as conn:
             c = conn.cursor()
@@ -459,9 +464,7 @@ def save_cached_lyrics(artist: str, title: str, lyrics_data: dict):
     """Save synchronized lyrics to dedicated lyrics.db so subsequent plays load offline in 0ms."""
     if not lyrics_data or not (lyrics_data.get("synced") or lyrics_data.get("plain")):
         return
-    clean_art = re.sub(r"\(.*?\)|\[.*?\]", "", artist).strip().lower()
-    clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", title).strip().lower()
-    cache_key = f"{clean_art}:::{clean_tit}"
+    cache_key = _make_lyrics_key(artist, title)
     try:
         with get_lyrics_conn() as conn:
             c = conn.cursor()
@@ -483,9 +486,7 @@ def save_cached_lyrics(artist: str, title: str, lyrics_data: dict):
 
 def delete_cached_lyrics(artist: str, title: str):
     """Delete a cached lyrics entry to force fresh fetch."""
-    clean_art = re.sub(r"\(.*?\)|\[.*?\]", "", artist).strip().lower()
-    clean_tit = re.sub(r"\(.*?\)|\[.*?\]|\bfeat\..*|\bft\..*", "", title).strip().lower()
-    cache_key = f"{clean_art}:::{clean_tit}"
+    cache_key = _make_lyrics_key(artist, title)
     try:
         with get_lyrics_conn() as conn:
             c = conn.cursor()
@@ -555,18 +556,21 @@ def load_all_library_albums() -> list:
         return []
 
 def prune_missing_library_albums(valid_paths: set):
-    """Remove albums from music_library.db if their folder was deleted from disk."""
+    """Remove albums from music_library.db only if their folder was truly deleted from disk."""
     if not valid_paths:
         return
     try:
+        norm_valid = {os.path.normcase(os.path.abspath(p)) for p in valid_paths if p}
         with get_library_conn() as conn:
             c = conn.cursor()
             c.execute("SELECT key, path FROM library_albums")
             to_delete = []
             for row in c.fetchall():
                 p = row["path"]
-                if p and p not in valid_paths:
-                    to_delete.append(row["key"])
+                if p:
+                    norm_p = os.path.normcase(os.path.abspath(p))
+                    if norm_p not in norm_valid and not os.path.exists(p):
+                        to_delete.append(row["key"])
             if to_delete:
                 c.executemany("DELETE FROM library_albums WHERE key = ?", [(k,) for k in to_delete])
                 conn.commit()
