@@ -24,6 +24,7 @@ def ensure_dependencies():
         "mutagen": "mutagen>=1.46.0",
         "yt_dlp": "yt-dlp>=2026.08.19",
         "imageio_ffmpeg": "imageio-ffmpeg>=0.4.8",
+        "psutil": "psutil>=5.9.0",
     }
     missing = []
     for mod, pkg in required.items():

@@ -2,18 +2,22 @@ import os
 import sys
 import time
 import gc
-import psutil
+try:
+    import psutil
+    _PROCESS = psutil.Process(os.getpid())
+    try:
+        _PROCESS.cpu_percent(interval=None)
+    except Exception:
+        pass
+except Exception:
+    psutil = None
+    _PROCESS = None
+
 from pathlib import Path
 from .config import CONFIG
 from .logger import get_recent_events, log_info
 
 _START_TIME = time.time()
-_PROCESS = psutil.Process(os.getpid())
-# Initial call to cpu_percent to start interval measuring
-try:
-    _PROCESS.cpu_percent(interval=None)
-except Exception:
-    pass
 
 
 def get_system_stats() -> dict:

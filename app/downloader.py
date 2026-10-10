@@ -1032,7 +1032,10 @@ DOWNLOAD_MANAGER = DownloadManager()
 
 def sync_browser_cookies() -> dict:
     """Safely extracts fresh YouTube verification cookies from Firefox or Microsoft Edge into data/cookies.txt."""
-    import psutil
+    try:
+        import psutil
+    except Exception:
+        psutil = None
     cookies_path = Path(__file__).parent.parent / "data" / "cookies.txt"
 
     # 1. Try Firefox first (instant zero-lock extraction if installed)
