@@ -173,6 +173,9 @@ class RecoveryEngine:
                 continue
 
             for alb_dir in album_dirs:
+                if alb_dir.name.lower() == "singles":
+                    continue
+
                 # Extract clean album name and year
                 folder_name = alb_dir.name
                 year_match = re.search(r"\((\d{4})\)$", folder_name)
@@ -184,6 +187,10 @@ class RecoveryEngine:
                 except Exception:
                     continue
 
+                # Ignore empty folders and single-track releases (not studio albums)
+                if len(audio_files) <= 1:
+                    continue
+
                 # Map track numbers present on disk from filename
                 present_numbers = set()
                 for f in audio_files:
@@ -191,23 +198,14 @@ class RecoveryEngine:
                     if m:
                         present_numbers.add(int(m.group(1)))
 
-                # Case A: Empty Album Folder (0 audio files)
-                if len(audio_files) == 0:
-                    gap_items.append({
-                        "artist": artist_name,
-                        "album": clean_album,
-                        "year": year,
-                        "missing_type": "empty_folder",
-                        "missing_track_nums": [],
-                        "dir": alb_dir
-                    })
-                    continue
-
-                # Case B: Sequence gap detected (e.g. tracks 1, 2, 4 present -> 3 missing)
-                if present_numbers:
+                # Real album sequence gap detected (e.g. tracks 1, 2, 4 present -> 3 missing)
+                if present_numbers and len(present_numbers) >= 2:
+                    min_num = min(present_numbers)
                     max_num = max(present_numbers)
+                    # Check gap from 1 to max_num
                     missing_in_seq = [n for n in range(1, max_num + 1) if n not in present_numbers]
-                    if missing_in_seq:
+                    # Only treat as genuine gap if at most a few tracks missing (not a completely different numbering scheme)
+                    if missing_in_seq and len(missing_in_seq) <= 8:
                         gap_items.append({
                             "artist": artist_name,
                             "album": clean_album,
@@ -219,7 +217,7 @@ class RecoveryEngine:
                             "present_count": len(present_numbers)
                         })
 
-        self.log("DISK SCAN", f"Identified {len(gap_items)} album folders with gaps or missing tracks.", GREEN)
+        self.log("DISK SCAN", f"Identified {len(gap_items)} authentic album folders with sequence gaps.", GREEN)
         return gap_items
 
     # ==========================================

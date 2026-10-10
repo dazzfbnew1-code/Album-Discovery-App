@@ -161,7 +161,7 @@ class DownloadManager:
         except Exception as e:
             log_error(f"Failed to sync persistent queue: {e}")
 
-    def add_album_job(self, album_id: str, title: str, artist: str, cover: str, year: str, tracks: list) -> dict:
+    def add_album_job(self, album_id: str, title: str, artist: str, cover: str, year: str, tracks: list, record_type: str = "") -> dict:
         with self._lock:
             for j in self.queue:
                 if j["id"] == str(album_id):
@@ -169,6 +169,7 @@ class DownloadManager:
             if self.active_job and self.active_job["id"] == str(album_id):
                 return self.active_job
 
+            is_single = (len(tracks) == 1) or (str(record_type).lower() == "single")
             job = {
                 "id": str(album_id),
                 "title": title,
@@ -177,6 +178,8 @@ class DownloadManager:
                 "year": year,
                 "tracks": tracks,
                 "total_tracks": len(tracks),
+                "is_single": is_single,
+                "record_type": record_type or ("single" if is_single else "album"),
                 "completed_tracks": 0,
                 "current_track_idx": 0,
                 "current_track_title": "",
@@ -212,6 +215,8 @@ class DownloadManager:
                 "year": year,
                 "tracks": [track],
                 "total_tracks": 1,
+                "is_single": True,
+                "record_type": "single",
                 "completed_tracks": 0,
                 "current_track_idx": 1,
                 "current_track_title": track.get("title", "Track"),
@@ -355,27 +360,42 @@ class DownloadManager:
         if not disk_check["has_space"]:
             raise RuntimeError(f"Disk full on {disk_check['path']} ({disk_check['free_mb']}MB free, need 250MB)")
 
-        folder_tmpl = CONFIG.get("folder_structure", "artist_album_year")
-        if folder_tmpl == "artist_album_year":
-            raw_dir_name = f"{safe_album} ({safe_year})" if safe_year and safe_year not in safe_album else safe_album
-            album_dir_name = sanitize_filename(raw_dir_name, safe_album, max_length=100)
-            album_dir = music_root / safe_artist / album_dir_name
-        elif folder_tmpl == "flat":
-            raw_flat = f"{safe_artist} - {safe_album} ({safe_year})" if safe_year else f"{safe_artist} - {safe_album}"
-            flat_name = sanitize_filename(raw_flat, f"{safe_artist} - {safe_album}", max_length=120)
-            album_dir = music_root / flat_name
-        else: # "artist_album"
-            album_dir = music_root / safe_artist / safe_album
+        is_single = (
+            job.get("is_single", False)
+            or (len(tracks) == 1)
+            or (str(job.get("record_type", "")).lower() == "single")
+            or str(album).strip().lower() in ["single", "singles"]
+        )
+
+        if is_single:
+            album_dir = music_root / safe_artist / "Singles"
+        else:
+            folder_tmpl = CONFIG.get("folder_structure", "artist_album_year")
+            if folder_tmpl == "artist_album_year":
+                raw_dir_name = f"{safe_album} ({safe_year})" if safe_year and safe_year not in safe_album else safe_album
+                album_dir_name = sanitize_filename(raw_dir_name, safe_album, max_length=100)
+                album_dir = music_root / safe_artist / album_dir_name
+            elif folder_tmpl == "flat":
+                raw_flat = f"{safe_artist} - {safe_album} ({safe_year})" if safe_year else f"{safe_artist} - {safe_album}"
+                flat_name = sanitize_filename(raw_flat, f"{safe_artist} - {safe_album}", max_length=120)
+                album_dir = music_root / flat_name
+            else: # "artist_album"
+                album_dir = music_root / safe_artist / safe_album
 
         album_dir = sanitize_path(album_dir)
         album_dir.mkdir(parents=True, exist_ok=True)
         job["dest_path"] = str(album_dir)
 
-        cover_path = album_dir / "cover.jpg"
+        if is_single:
+            single_title_safe = sanitize_filename(tracks[0].get("title", album), "single", max_length=90)
+            cover_path = sanitize_path(album_dir / f"{single_title_safe}.cover.jpg")
+        else:
+            cover_path = album_dir / "cover.jpg"
+
         if cover_url and not cover_path.exists() and CONFIG.get("save_cover_jpg", True):
             try:
                 urllib.request.urlretrieve(cover_url, str(cover_path))
-                log_download(f"  [COVER ART] Saved album artwork to {cover_path}")
+                log_download(f"  [COVER ART] Saved artwork to {cover_path}")
             except Exception as e:
                 log_warn(f"  [COVER ART WARNING] Could not download cover: {e}")
 
@@ -394,7 +414,10 @@ class DownloadManager:
             tr_artist = tr.get("artist") or artist
 
             safe_title = sanitize_filename(tr_title, f"Track {idx}", max_length=90)
-            out_filename = f"{tr_num:02d} - {safe_title}.{ext}"
+            if is_single:
+                out_filename = f"{safe_title}.{ext}"
+            else:
+                out_filename = f"{tr_num:02d} - {safe_title}.{ext}"
             out_file = sanitize_path(album_dir / out_filename)
 
             if out_file.exists() and out_file.stat().st_size > 100000:
@@ -504,11 +527,17 @@ class DownloadManager:
         except Exception:
             pass
         log_download(f"  [ALBUM VERIFIED [OK]] {verified_count}/{total} tracks verified intact on disk.")
+        if is_single and cover_path.exists():
+            try:
+                cover_path.unlink(missing_ok=True)
+            except Exception:
+                pass
         if verified_count == 0:
             try:
                 if cover_path.exists():
                     cover_path.unlink(missing_ok=True)
-                album_dir.rmdir()
+                if not is_single:
+                    album_dir.rmdir()
             except Exception:
                 pass
             raise RuntimeError(f"0/{total} tracks could be downloaded")

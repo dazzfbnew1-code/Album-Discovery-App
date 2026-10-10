@@ -474,7 +474,8 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
                 self._send_json({"error": "No tracks found to download"}, 400)
                 return
 
-            job = DOWNLOAD_MANAGER.add_album_job(album_id, title, artist, cover, year, tracks)
+            record_type = data.get("record_type") or data.get("type") or ""
+            job = DOWNLOAD_MANAGER.add_album_job(album_id, title, artist, cover, year, tracks, record_type=record_type)
             self._send_json({"status": "queued", "job": job})
 
         elif route == "download/batch":
@@ -487,6 +488,7 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
                 artist = alb.get("artist") or ""
                 cover = alb.get("cover_big") or alb.get("cover_small") or alb.get("cover") or ""
                 year = alb.get("year", "")
+                rec_type = alb.get("record_type") or alb.get("type") or ""
 
                 # Skip already owned albums in batch downloads
                 if is_album_owned(artist, title).get("owned"):
@@ -502,8 +504,9 @@ class AppRequestHandler(SimpleHTTPRequestHandler):
                         year = year or details.get("year") or ""
                         title = title or details.get("title") or ""
                         artist = artist or details.get("artist") or ""
+                        rec_type = rec_type or details.get("record_type") or details.get("type") or ""
                 if aid and title and artist and tracks:
-                    job = DOWNLOAD_MANAGER.add_album_job(aid, title, artist, cover, year, tracks)
+                    job = DOWNLOAD_MANAGER.add_album_job(aid, title, artist, cover, year, tracks, record_type=rec_type)
                     queued_jobs.append(job)
             self._send_json({"status": "queued", "count": len(queued_jobs), "skipped_owned": skipped_owned, "jobs": queued_jobs})
 
