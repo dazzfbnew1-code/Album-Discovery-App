@@ -21,28 +21,6 @@ try:
 except Exception:
     HAS_YTDLP = False
 
-# Dynamic Mutagen Modules
-EasyID3 = None
-ID3 = None
-APIC = None
-MP4 = None
-MP4Cover = None
-OggVorbis = None
-OggOpus = None
-
-try:
-    EasyID3 = importlib.import_module("mutagen.easyid3").EasyID3
-    mutagen_id3 = importlib.import_module("mutagen.id3")
-    ID3 = mutagen_id3.ID3
-    APIC = mutagen_id3.APIC
-    mutagen_mp4 = importlib.import_module("mutagen.mp4")
-    MP4 = mutagen_mp4.MP4
-    MP4Cover = mutagen_mp4.MP4Cover
-    OggVorbis = importlib.import_module("mutagen.oggvorbis").OggVorbis
-    OggOpus = importlib.import_module("mutagen.oggopus").OggOpus
-    HAS_MUTAGEN = True
-except Exception:
-    HAS_MUTAGEN = False
 
 FORMAT_SPECS = {
     "320k": {"codec": "mp3",  "quality": "320", "ext": "mp3"},
@@ -484,9 +462,6 @@ class DownloadManager:
                         lyrics=track_lyrics_text
                     )
                     log_download(f"  [TRACK {idx}/{total} TAGGED [OK]] ID3 tags, artwork & lyrics embedded in {out_filename}")
-                elif HAS_MUTAGEN and out_file.exists():
-                    self._tag_audio_file(str(out_file), tr_title, tr_artist, album, tr_num, total, year, cov_to_embed or None, ext, lyrics=track_lyrics_text)
-                    log_download(f"  [TRACK {idx}/{total} TAGGED [OK]] Audio tags written to {out_filename}")
 
                 with progress_lock:
                     completed_count += 1
@@ -958,69 +933,6 @@ class DownloadManager:
             _cleanup_partial_artifacts()
             err_msg = str(last_err) if last_err else "No playable audio stream or candidates resolved across primary and fallback searches"
             raise RuntimeError(f"Could not download audio track '{title}': {err_msg}")
-
-    def _tag_audio_file(self, file_path: str, title: str, artist: str, album: str, track_no: int, total_tracks: int, year: str, cover_path: str = None, ext: str = "mp3", lyrics: str = ""):
-        try:
-            if ext == "m4a" and MP4:
-                audio = MP4(file_path)
-                audio["\xa9nam"] = [title]
-                audio["\xa9ART"] = [artist]
-                audio["aART"] = [artist]
-                audio["\xa9alb"] = [album]
-                audio["trkn"] = [(track_no, total_tracks)]
-                if year: audio["\xa9day"] = [str(year)]
-                if lyrics: audio["\xa9lyr"] = [lyrics]
-                if cover_path and Path(cover_path).exists() and MP4Cover:
-                    with open(cover_path, "rb") as f:
-                        audio["covr"] = [MP4Cover(f.read(), imageformat=MP4Cover.FORMAT_JPEG)]
-                audio.save()
-
-            elif ext in ["ogg", "opus"]:
-                if ext == "opus" and OggOpus:
-                    audio = OggOpus(file_path)
-                elif OggVorbis:
-                    audio = OggVorbis(file_path)
-                else:
-                    audio = None
-                if audio:
-                    audio["title"] = title
-                    audio["artist"] = artist
-                    audio["albumartist"] = artist
-                    audio["album"] = album
-                    audio["tracknumber"] = f"{track_no}/{total_tracks}"
-                    if year: audio["date"] = str(year)
-                    audio.save()
-
-            elif EasyID3 and ID3:
-                try:
-                    audio = EasyID3(file_path)
-                except Exception:
-                    audio = EasyID3()
-                    audio.save(file_path)
-                audio["title"] = title
-                audio["artist"] = artist
-                audio["albumartist"] = artist
-                audio["album"] = album
-                audio["tracknumber"] = f"{track_no}/{total_tracks}"
-                if year: audio["date"] = str(year)
-                audio.save()
-
-                if cover_path and Path(cover_path).exists() and APIC:
-                    try:
-                        id3 = ID3(file_path)
-                        with open(cover_path, "rb") as f:
-                            id3.add(APIC(
-                                encoding=3,
-                                mime="image/jpeg",
-                                type=3,
-                                desc="Cover",
-                                data=f.read()
-                            ))
-                        id3.save(v2_version=3)
-                    except Exception:
-                        pass
-        except Exception as e:
-            log_warn(f"Tagging error for {file_path}: {e}")
 
 DOWNLOAD_MANAGER = DownloadManager()
 
