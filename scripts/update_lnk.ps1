@@ -35,7 +35,7 @@ if ($desktop -and (Test-Path $desktop)) {
     $s2.TargetPath = Join-Path $appDir "START.bat"
     $s2.WorkingDirectory = $appDir
     $s2.IconLocation = "$iconFile,0"
-    $s2.WindowStyle = 7
+    $s2.WindowStyle = 1
     $s2.Description = "Album Discovery Studio"
     $s2.Save()
     Write-Host "[SUCCESS] Created Desktop Shortcut at: $shortcutPath" -ForegroundColor Green

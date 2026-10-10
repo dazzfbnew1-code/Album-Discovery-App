@@ -112,27 +112,33 @@ def main():
         except Exception:
             pass
 
+    gui_launched = False
     if webview:
-        win_title = APP_WINDOW_TITLE
-        window = webview.create_window(
-            title=win_title,
-            url=app_url,
-            width=1440,
-            height=900,
-            min_size=(1020, 680),
-            maximized=True,
-            resizable=True,
-            background_color="#0b0f19",
-            text_select=False,
-            confirm_close=False
-        )
-        if icon_path:
-            threading.Thread(target=apply_win32_window_icon, args=(win_title, icon_path), daemon=True).start()
-        webview.start(icon=icon_path, debug=False)
-        from app.system import cleanup_system_resources
-        cleanup_system_resources()
-        os._exit(0)
-    else:
+        try:
+            win_title = APP_WINDOW_TITLE
+            window = webview.create_window(
+                title=win_title,
+                url=app_url,
+                width=1440,
+                height=900,
+                min_size=(1020, 680),
+                maximized=True,
+                resizable=True,
+                background_color="#0b0f19",
+                text_select=False,
+                confirm_close=False
+            )
+            if icon_path:
+                threading.Thread(target=apply_win32_window_icon, args=(win_title, icon_path), daemon=True).start()
+            webview.start(icon=icon_path, debug=False)
+            gui_launched = True
+            from app.system import cleanup_system_resources
+            cleanup_system_resources()
+            os._exit(0)
+        except Exception:
+            gui_launched = False
+
+    if not gui_launched:
         import webbrowser
         webbrowser.open(app_url)
         try:
@@ -144,5 +150,28 @@ def main():
             sys.exit(0)
 
 
+def safe_main():
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "logs")
+        os.makedirs(log_dir, exist_ok=True)
+        crash_log = os.path.join(log_dir, "crash.log")
+        with open(crash_log, "a", encoding="utf-8") as f:
+            f.write(f"\n--- CRASH AT {time.strftime('%Y-%m-%d %H:%M:%S')} ---\n")
+            traceback.print_exc(file=f)
+        try:
+            ctypes.windll.user32.MessageBoxW(
+                0,
+                f"Album Discovery App encountered an unexpected startup error:\n\n{e}\n\nPlease check data/logs/crash.log",
+                "Album Discovery App",
+                0x10
+            )
+        except Exception:
+            pass
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    main()
+    safe_main()

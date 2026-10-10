@@ -4,6 +4,25 @@ set PYTHONDONTWRITEBYTECODE=1
 cd /d "%~dp0"
 title Album Discovery App Launcher
 
+:: Check if user ran directly from inside zip without extracting
+echo "%~dp0" | findstr /i "\\AppData\\Local\\Temp\\" >nul
+if %errorlevel% equ 0 (
+    echo ========================================================
+    echo   [NOTICE] PLEASE EXTRACT THE ZIP FILE BEFORE RUNNING!
+    echo ========================================================
+    echo.
+    echo It looks like you opened START.bat directly from inside the ZIP.
+    echo Windows cannot launch properly from a temporary folder.
+    echo.
+    echo How to fix:
+    echo 1. Right-click the downloaded ZIP file.
+    echo 2. Click "Extract All..." and extract to your PC.
+    echo 3. Open the extracted folder and run START.bat.
+    echo.
+    pause
+    exit /b 1
+)
+
 :: 1. Verify dependencies first
 where py >nul 2>nul
 if %errorlevel% equ 0 (
