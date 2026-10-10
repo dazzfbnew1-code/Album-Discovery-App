@@ -23,45 +23,54 @@ if %errorlevel% equ 0 (
     exit /b 1
 )
 
-:: 1. Verify dependencies first
+:: Find Python executable
+set "PY_CMD="
 where py >nul 2>nul
-if %errorlevel% equ 0 (
-    py -c "import mutagen, yt_dlp, requests, imageio_ffmpeg" >nul 2>nul
-    if errorlevel 1 (
-        echo [SETUP] Installing required modules for first run...
-        py -m pip install -r requirements.txt
-        if errorlevel 1 (
-            echo [ERROR] Failed to install required dependencies. Please check your internet connection.
-            pause
-            exit /b 1
-        )
-    )
-) else (
+if %errorlevel% equ 0 set "PY_CMD=py"
+
+if not defined PY_CMD (
     where python >nul 2>nul
-    if %errorlevel% equ 0 (
-        python -c "import mutagen, yt_dlp, requests, imageio_ffmpeg" >nul 2>nul
-        if errorlevel 1 (
-            echo [SETUP] Installing required modules for first run...
-            python -m pip install -r requirements.txt
-            if errorlevel 1 (
-                echo [ERROR] Failed to install required dependencies. Please check your internet connection.
-                pause
-                exit /b 1
-            )
-        )
+    if %errorlevel% equ 0 set "PY_CMD=python"
+)
+
+if not defined PY_CMD (
+    for /d %%D in ("%LocalAppData%\Programs\Python\Python3*") do (
+        if exist "%%~D\python.exe" set "PY_CMD=%%~D\python.exe"
+    )
+)
+
+if not defined PY_CMD (
+    for /d %%D in ("%ProgramFiles%\Python3*") do (
+        if exist "%%~D\python.exe" set "PY_CMD=%%~D\python.exe"
+    )
+)
+
+if not defined PY_CMD (
+    echo ========================================================
+    echo   [ERROR] Python 3 was not detected on this computer!
+    echo ========================================================
+    echo.
+    echo Please install Python 3.10+ from: https://www.python.org/downloads/
+    echo Make sure to check the box: "Add Python to PATH" during installation.
+    echo.
+    pause
+    exit /b 1
+)
+
+:: 1. Verify dependencies first
+"%PY_CMD%" -c "import mutagen, yt_dlp, requests, imageio_ffmpeg" >nul 2>nul
+if errorlevel 1 (
+    echo [SETUP] Installing required modules for first run...
+    "%PY_CMD%" -m pip install -r "%~dp0requirements.txt"
+    if errorlevel 1 (
+        echo [ERROR] Failed to install required dependencies. Please check your internet connection.
+        pause
+        exit /b 1
     )
 )
 
 :: 2. Check for updates in background (never delays startup)
-where py >nul 2>nul
-if %errorlevel% equ 0 (
-    start "" /b py "%~dp0scripts\check_update.py" >nul 2>nul
-) else (
-    where python >nul 2>nul
-    if %errorlevel% equ 0 (
-        start "" /b python "%~dp0scripts\check_update.py" >nul 2>nul
-    )
-)
+start "" /b "%PY_CMD%" "%~dp0scripts\check_update.py" >nul 2>nul
 
 :: 3. Create Desktop shortcut once on first run
 if not exist "%userprofile%\Desktop\Album Discovery App.lnk" (
@@ -69,33 +78,28 @@ if not exist "%userprofile%\Desktop\Album Discovery App.lnk" (
 )
 
 :: 4. Launch in Windowless GUI Mode (No persistent console window)
+set "PYW_CMD="
 where pyw >nul 2>nul
-if %errorlevel% equ 0 (
-    start "" pyw -3 main.py
+if %errorlevel% equ 0 set "PYW_CMD=pyw -3"
+
+if not defined PYW_CMD (
+    where pythonw >nul 2>nul
+    if %errorlevel% equ 0 set "PYW_CMD=pythonw"
+)
+
+if not defined PYW_CMD (
+    for /d %%D in ("%LocalAppData%\Programs\Python\Python3*") do (
+        if exist "%%~D\pythonw.exe" set "PYW_CMD=%%~D\pythonw.exe"
+    )
+)
+
+if defined PYW_CMD (
+    start "" %PYW_CMD% main.py
     exit /b 0
 )
 
-where pythonw >nul 2>nul
-if %errorlevel% equ 0 (
-    start "" pythonw main.py
-    exit /b 0
-)
-
-where py >nul 2>nul
-if %errorlevel% equ 0 (
-    start "" py -3 main.py
-    exit /b 0
-)
-
-where python >nul 2>nul
-if %errorlevel% equ 0 (
-    start "" python main.py
-    exit /b 0
-)
-
-echo [ERROR] Python 3 was not detected. Please install Python 3.10+.
-pause
-exit /b 1
+start "" "%PY_CMD%" main.py
+exit /b 0
 
 
 

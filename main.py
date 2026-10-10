@@ -17,6 +17,33 @@ try:
 except Exception:
     pass
 
+def ensure_dependencies():
+    """Self-healing: if any required packages are missing, installs them automatically."""
+    required = {
+        "requests": "requests>=2.28.0",
+        "mutagen": "mutagen>=1.46.0",
+        "yt_dlp": "yt-dlp>=2026.08.19",
+        "imageio_ffmpeg": "imageio-ffmpeg>=0.4.8",
+    }
+    missing = []
+    for mod, pkg in required.items():
+        try:
+            importlib.import_module(mod)
+        except ImportError:
+            missing.append(pkg)
+    if missing:
+        import subprocess
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", *missing],
+                stdout=subprocess.DEVNULL if not sys.stdout else None,
+                stderr=subprocess.DEVNULL if not sys.stderr else None,
+            )
+        except Exception:
+            pass
+
+ensure_dependencies()
+
 webview = None
 try:
     webview = importlib.import_module("webview")
