@@ -147,6 +147,10 @@ def get_library_roots_snapshot() -> dict:
                                 and not alb_name_lower.startswith(".")):
                                 try:
                                     snap[album_entry.path] = album_entry.stat().st_mtime
+                                    if alb_name_lower in {"albums", "compilations", "live", "eps", "soundtracks"}:
+                                        for sub_entry in os.scandir(album_entry.path):
+                                            if sub_entry.is_dir(follow_symlinks=False):
+                                                snap[sub_entry.path] = sub_entry.stat().st_mtime
                                 except Exception:
                                     pass
                     except Exception:
@@ -281,7 +285,7 @@ def scan_local_library(custom_root: str = None) -> dict:
             root_depth = len(root_dir.parts)
             for current_root, dirs, files in os.walk(str(root_dir)):
                 cur_path = Path(current_root)
-                if len(cur_path.parts) - root_depth > 3:
+                if len(cur_path.parts) - root_depth > 4:
                     dirs.clear()
                     continue
                 # Prune system/hidden directories from traversal
@@ -299,7 +303,11 @@ def scan_local_library(custom_root: str = None) -> dict:
                 audio_files = [f for f in files if Path(f).suffix.lower() in AUDIO_EXTS]
                 if audio_files:
                     album_name = cur_path.name
-                    artist_name = cur_path.parent.name if cur_path.parent != root_dir else ""
+                    parent_name_lower = cur_path.parent.name.lower()
+                    if parent_name_lower in {"albums", "compilations", "live", "eps", "soundtracks"}:
+                        artist_name = cur_path.parent.parent.name if cur_path.parent.parent != root_dir else ""
+                    else:
+                        artist_name = cur_path.parent.name if cur_path.parent != root_dir else ""
                     
                     if not artist_name and " - " in album_name:
                         parts = album_name.split(" - ", 1)
@@ -313,6 +321,18 @@ def scan_local_library(custom_root: str = None) -> dict:
                         continue
 
                     year_str, rec_type = extract_local_album_metadata(cur_path, audio_files, album_name)
+                    # Override rec_type if explicitly in a category folder
+                    if parent_name_lower == "compilations":
+                        rec_type = "compilation"
+                    elif parent_name_lower == "live":
+                        rec_type = "live"
+                    elif parent_name_lower == "eps":
+                        rec_type = "ep"
+                    elif parent_name_lower == "albums":
+                        rec_type = "album"
+                    elif album_name.lower() == "singles":
+                        rec_type = "single"
+
                     key = make_album_key(artist_name, album_name)
                     alb_info = {
                         "artist": artist_name,

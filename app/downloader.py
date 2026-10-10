@@ -367,20 +367,30 @@ class DownloadManager:
             or str(album).strip().lower() in ["single", "singles"]
         )
 
+        rec_type_low = str(job.get("record_type", "")).lower()
         if is_single:
             album_dir = music_root / safe_artist / "Singles"
         else:
+            if rec_type_low in ["compile", "compilation"] or any(k in album.lower() for k in ["greatest hits", "best of", "anthology", "collection", "essentials", "the hits", "platinum", "gold", "mixtape", "lost tape"]):
+                category = "Compilations"
+            elif rec_type_low == "live" or any(k in album.lower() for k in ["live", "in concert", "unplugged", "tour"]):
+                category = "Live"
+            elif rec_type_low == "ep" or (1 < len(tracks) <= 6 and "deluxe" not in album.lower()):
+                category = "EPs"
+            else:
+                category = "Albums"
+
             folder_tmpl = CONFIG.get("folder_structure", "artist_album_year")
             if folder_tmpl == "artist_album_year":
                 raw_dir_name = f"{safe_album} ({safe_year})" if safe_year and safe_year not in safe_album else safe_album
                 album_dir_name = sanitize_filename(raw_dir_name, safe_album, max_length=100)
-                album_dir = music_root / safe_artist / album_dir_name
+                album_dir = music_root / safe_artist / category / album_dir_name
             elif folder_tmpl == "flat":
                 raw_flat = f"{safe_artist} - {safe_album} ({safe_year})" if safe_year else f"{safe_artist} - {safe_album}"
                 flat_name = sanitize_filename(raw_flat, f"{safe_artist} - {safe_album}", max_length=120)
                 album_dir = music_root / flat_name
             else: # "artist_album"
-                album_dir = music_root / safe_artist / safe_album
+                album_dir = music_root / safe_artist / category / safe_album
 
         album_dir = sanitize_path(album_dir)
         album_dir.mkdir(parents=True, exist_ok=True)
@@ -740,7 +750,7 @@ class DownloadManager:
             tier1_opts = dict(ydl_opts)
             tier1_opts["extractor_args"] = {
                 "youtube": {
-                    "player_client": ["android", "ios"]
+                    "player_client": ["web", "tv_embedded", "android", "ios"]
                 }
             }
             
