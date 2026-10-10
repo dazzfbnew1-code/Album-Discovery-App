@@ -2,16 +2,23 @@ import os
 import sys
 import time
 import gc
-try:
-    import psutil
-    _PROCESS = psutil.Process(os.getpid())
+_PROCESS = None
+
+def _get_process():
+    """Dynamically acquires the current process with lazy psutil loading."""
+    global _PROCESS
+    if _PROCESS is not None:
+        return _PROCESS
     try:
-        _PROCESS.cpu_percent(interval=None)
+        import psutil
+        _PROCESS = psutil.Process(os.getpid())
+        try:
+            _PROCESS.cpu_percent(interval=None)
+        except Exception:
+            pass
+        return _PROCESS
     except Exception:
-        pass
-except Exception:
-    psutil = None
-    _PROCESS = None
+        return None
 
 from pathlib import Path
 from .config import CONFIG
@@ -24,18 +31,27 @@ def get_system_stats() -> dict:
     now = time.time()
     uptime_seconds = int(now - _START_TIME)
 
+    proc = _get_process()
     # Process CPU & RAM
     try:
-        mem_info = _PROCESS.memory_info()
-        rss_bytes = mem_info.rss
-        ram_mb = round(rss_bytes / (1024 * 1024), 1)
-        ram_pct = round(_PROCESS.memory_percent(), 1)
-        raw_cpu = _PROCESS.cpu_percent(interval=None)
-        cpu_cores = psutil.cpu_count() or 1
-        # Normalize CPU to 0-100% scale (consistent with Windows Task Manager)
-        cpu_pct = min(100.0, max(0.0, round(raw_cpu / cpu_cores, 1)))
-        raw_cpu_pct = round(raw_cpu, 1)
-        num_threads = _PROCESS.num_threads()
+        if proc:
+            mem_info = proc.memory_info()
+            rss_bytes = mem_info.rss
+            ram_mb = round(rss_bytes / (1024 * 1024), 1)
+            ram_pct = round(proc.memory_percent(), 1)
+            raw_cpu = proc.cpu_percent(interval=None)
+            import psutil
+            cpu_cores = psutil.cpu_count() or 1
+            cpu_pct = min(100.0, max(0.0, round(raw_cpu / cpu_cores, 1)))
+            raw_cpu_pct = round(raw_cpu, 1)
+            num_threads = proc.num_threads()
+        else:
+            ram_mb = 0.0
+            ram_pct = 0.0
+            cpu_pct = 0.0
+            raw_cpu_pct = 0.0
+            cpu_cores = 1
+            num_threads = 0
     except Exception:
         ram_mb = 0.0
         ram_pct = 0.0
@@ -48,7 +64,7 @@ def get_system_stats() -> dict:
     children_info = []
     encoder_count = 0
     try:
-        for child in _PROCESS.children(recursive=True):
+        for child in (proc.children(recursive=True) if proc else []):
             try:
                 c_name = child.name()
                 c_pid = child.pid
@@ -176,8 +192,9 @@ def get_system_stats() -> dict:
 
 def trim_memory() -> dict:
     """Run garbage collection and return reclaimed memory statistics."""
+    proc = _get_process()
     try:
-        before_mem = round(_PROCESS.memory_info().rss / (1024 * 1024), 1)
+        before_mem = round(proc.memory_info().rss / (1024 * 1024), 1) if proc else 0.0
     except Exception:
         before_mem = 0.0
 
@@ -185,7 +202,7 @@ def trim_memory() -> dict:
     time.sleep(0.05)
 
     try:
-        after_mem = round(_PROCESS.memory_info().rss / (1024 * 1024), 1)
+        after_mem = round(proc.memory_info().rss / (1024 * 1024), 1) if proc else before_mem
     except Exception:
         after_mem = before_mem
 
