@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import unicodedata
 from typing import Dict, List, Tuple, Any
 
 from .config import DATA_DIR
@@ -13,8 +14,6 @@ _OVERRIDES_CACHE: Dict[str, Any] = {
     "data": {}
 }
 
-
-import unicodedata
 
 def _normalize_str(text: str) -> str:
     """Strip punctuation and extra whitespace for robust rule matching."""

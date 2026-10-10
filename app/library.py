@@ -7,7 +7,6 @@ from pathlib import Path
 from .config import CONFIG, DEFAULT_DOWNLOAD_DIR, get_configured_music_roots
 from .logger import log_info, log_discovery, log_error
 from .db import (
-    get_conn, 
     get_library_conn, 
     save_library_albums_batch, 
     load_all_library_albums, 

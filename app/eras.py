@@ -2,49 +2,31 @@
 from .overrides import get_decade_landmarks, get_decade_iconic_artists
 
 
-class _DynamicDecadeLandmarks(dict):
-    """Dictionary-like proxy for decade landmark masterpieces."""
+class _DynamicDecadeProxy(dict):
+    """Dictionary-like proxy that always retrieves current decade data dynamically."""
+
+    def __init__(self, getter_func):
+        super().__init__()
+        self._getter = getter_func
 
     def __getitem__(self, key):
-        return get_decade_landmarks().get(key, [])
+        return self._getter().get(key, [])
 
     def get(self, key, default=None):
-        return get_decade_landmarks().get(key, default)
+        return self._getter().get(key, default)
 
     def __contains__(self, key):
-        return key in get_decade_landmarks()
+        return key in self._getter()
 
     def items(self):
-        return get_decade_landmarks().items()
+        return self._getter().items()
 
     def keys(self):
-        return get_decade_landmarks().keys()
+        return self._getter().keys()
 
     def values(self):
-        return get_decade_landmarks().values()
+        return self._getter().values()
 
 
-class _DynamicDecadeArtists(dict):
-    """Dictionary-like proxy for decade iconic artists."""
-
-    def __getitem__(self, key):
-        return get_decade_iconic_artists().get(key, [])
-
-    def get(self, key, default=None):
-        return get_decade_iconic_artists().get(key, default)
-
-    def __contains__(self, key):
-        return key in get_decade_iconic_artists()
-
-    def items(self):
-        return get_decade_iconic_artists().items()
-
-    def keys(self):
-        return get_decade_iconic_artists().keys()
-
-    def values(self):
-        return get_decade_iconic_artists().values()
-
-
-DECADE_LANDMARKS = _DynamicDecadeLandmarks()
-DECADE_ICONIC_ARTISTS = _DynamicDecadeArtists()
+DECADE_LANDMARKS = _DynamicDecadeProxy(get_decade_landmarks)
+DECADE_ICONIC_ARTISTS = _DynamicDecadeProxy(get_decade_iconic_artists)
