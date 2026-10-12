@@ -12,18 +12,20 @@ from app.providers import fetch_json
 from app.downloader import DownloadManager
 from app.tagger import tag_mp3_file
 from app.lyrics import get_track_lyrics
+from app.config import CONFIG, DEFAULT_DOWNLOAD_DIR, get_configured_music_roots
 from app.logger import log_download, log_info, log_error
 
 def scan_and_repair(dry_run: bool = False):
-    root = Path("H:/")
-    if not root.exists():
-        print(f"Error: {root} does not exist!")
+    roots = get_configured_music_roots()
+    target_root = Path(CONFIG.get("download_root") or CONFIG.get("music_root") or roots[0] if roots else DEFAULT_DOWNLOAD_DIR)
+    if not target_root.exists():
+        print(f"Error: {target_root} does not exist!")
         return
 
     abnormal_files = []
-    print("Step 1: Scanning H:/ for oversized audio files (>35MB / >12 mins)...")
+    print(f"Step 1: Scanning {target_root} for oversized audio files (>35MB / >12 mins)...")
 
-    for dirpath, dirnames, filenames in os.walk(str(root)):
+    for dirpath, dirnames, filenames in os.walk(str(target_root)):
         if "$RECYCLE.BIN" in dirpath or "System Volume Information" in dirpath:
             continue
         for f in filenames:

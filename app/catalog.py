@@ -121,37 +121,6 @@ def fetch_era_albums_dynamically(start_year: int, end_year: int) -> list:
 
     # 2. Query iconic legends for this decade across their studio discographies
     legend_pool = list(DECADE_ICONIC_ARTISTS.get(decade_key, []))
-    if start_year <= 1949:
-        legend_pool.extend([
-            "Glenn Miller", "Duke Ellington", "Billie Holiday", "Ella Fitzgerald",
-            "Louis Armstrong", "Count Basie", "Tommy Dorsey", "Frank Sinatra",
-            "Bing Crosby", "Benny Goodman", "Artie Shaw", "Cab Calloway",
-            "Django Reinhardt", "Fats Waller", "Coleman Hawkins", "Lester Young",
-            "Nat King Cole", "Woody Herman", "Gene Krupa", "Harry James"
-        ])
-    elif start_year == 1950:
-        legend_pool.extend([
-            "Elvis Presley", "Chuck Berry", "Little Richard", "Buddy Holly",
-            "Bill Haley", "Fats Domino", "Jerry Lee Lewis", "Everly Brothers",
-            "Sam Cooke", "Hank Williams", "Bo Diddley", "Muddy Waters",
-            "Ray Charles", "Johnny Cash", "Miles Davis", "John Coltrane", "Chet Baker"
-        ])
-    elif start_year == 1960:
-        legend_pool.extend([
-            "The Beatles", "The Rolling Stones", "Bob Dylan", "The Who",
-            "The Beach Boys", "The Doors", "Jimi Hendrix", "Led Zeppelin",
-            "Pink Floyd", "Cream", "The Kinks", "Simon & Garfunkel",
-            "Aretha Franklin", "Otis Redding", "The Temptations", "Marvin Gaye"
-        ])
-    elif start_year == 1990:
-        legend_pool.extend([
-            "Nirvana", "Pearl Jam", "Soundgarden", "Alice in Chains",
-            "Radiohead", "Oasis", "Blur", "Smashing Pumpkins",
-            "Green Day", "Weezer", "Red Hot Chili Peppers", "R.E.M.",
-            "Tupac", "Notorious BIG", "Nas", "Wu-Tang Clan", "Snoop Dogg", "Dr Dre",
-            "Alanis Morissette", "Foo Fighters", "Blink-182", "Korn", "Pantera",
-            "Lauryn Hill", "Fatboy Slim", "Chemical Brothers", "Beck", "Massive Attack", "Portishead"
-        ])
 
     # Deduplicate legend pool
     seen_legends = set()
@@ -1416,7 +1385,11 @@ def _bind_local_tracks_if_owned(tracks: list, owned_status: dict):
             return
         from .library import AUDIO_EXTS
         import urllib.parse
-        local_files = sorted([f for f in alb_dir.iterdir() if f.suffix.lower() in AUDIO_EXTS], key=lambda f: f.name)
+        local_files = sorted([f for f in alb_dir.iterdir() if f.is_file() and f.suffix.lower() in AUDIO_EXTS], key=lambda f: f.name)
+        if not local_files:
+            for sub in sorted(alb_dir.iterdir(), key=lambda d: d.name):
+                if sub.is_dir():
+                    local_files.extend(sorted([f for f in sub.iterdir() if f.is_file() and f.suffix.lower() in AUDIO_EXTS], key=lambda f: f.name))
         if not local_files:
             return
         if len(local_files) == len(tracks):

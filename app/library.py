@@ -301,12 +301,23 @@ def scan_local_library(custom_root: str = None) -> dict:
 
                 audio_files = [f for f in files if Path(f).suffix.lower() in AUDIO_EXTS]
                 if audio_files:
-                    album_name = cur_path.name
-                    parent_name_lower = cur_path.parent.name.lower()
-                    if parent_name_lower in {"albums", "compilations", "live", "eps", "soundtracks"}:
-                        artist_name = cur_path.parent.parent.name if cur_path.parent.parent != root_dir else ""
+                    is_disc_subfolder = bool(re.match(r"^(?:cd|disc|disk|part|vol|volume)\s*\d+$", cur_path.name, re.IGNORECASE))
+                    if is_disc_subfolder and cur_path.parent != root_dir:
+                        real_album_path = cur_path.parent
+                        album_name = real_album_path.name
+                        parent_cat = real_album_path.parent.name.lower()
+                        if parent_cat in {"albums", "compilations", "live", "eps", "soundtracks"}:
+                            artist_name = real_album_path.parent.parent.name if real_album_path.parent.parent != root_dir else ""
+                        else:
+                            artist_name = real_album_path.parent.name if real_album_path.parent != root_dir else ""
                     else:
-                        artist_name = cur_path.parent.name if cur_path.parent != root_dir else ""
+                        real_album_path = cur_path
+                        album_name = cur_path.name
+                        parent_cat = cur_path.parent.name.lower()
+                        if parent_cat in {"albums", "compilations", "live", "eps", "soundtracks"}:
+                            artist_name = cur_path.parent.parent.name if cur_path.parent.parent != root_dir else ""
+                        else:
+                            artist_name = cur_path.parent.name if cur_path.parent != root_dir else ""
                     
                     if not artist_name and " - " in album_name:
                         parts = album_name.split(" - ", 1)
@@ -319,34 +330,38 @@ def scan_local_library(custom_root: str = None) -> dict:
                     if "$recycle" in artist_name.lower() or "$recycle" in album_name.lower():
                         continue
 
-                    year_str, rec_type = extract_local_album_metadata(cur_path, audio_files, album_name)
+                    year_str, rec_type = extract_local_album_metadata(real_album_path, audio_files, album_name)
                     # Override rec_type if explicitly in a category folder
-                    if parent_name_lower == "compilations":
+                    if parent_cat == "compilations":
                         rec_type = "compilation"
-                    elif parent_name_lower == "live":
+                    elif parent_cat == "live":
                         rec_type = "live"
-                    elif parent_name_lower == "eps":
+                    elif parent_cat == "eps":
                         rec_type = "ep"
-                    elif parent_name_lower == "albums":
+                    elif parent_cat == "albums":
                         rec_type = "album"
                     elif album_name.lower() == "singles":
                         rec_type = "single"
 
                     key = make_album_key(artist_name, album_name)
-                    alb_info = {
-                        "artist": artist_name,
-                        "album": album_name,
-                        "path": str(cur_path),
-                        "track_count": len(audio_files),
-                        "year": year_str,
-                        "type": rec_type,
-                        "id": ""
-                    }
-                    scanned_albums[key] = alb_info
-                    norm_art = normalize_text(artist_name)
-                    if norm_art:
-                        scanned_by_artist.setdefault(norm_art, []).append(alb_info)
-                    scanned_titles.add(normalize_text(album_name))
+                    if key in scanned_albums and is_disc_subfolder:
+                        scanned_albums[key]["track_count"] += len(audio_files)
+                        scanned_albums[key]["path"] = str(real_album_path)
+                    else:
+                        alb_info = {
+                            "artist": artist_name,
+                            "album": album_name,
+                            "path": str(real_album_path),
+                            "track_count": len(audio_files),
+                            "year": year_str,
+                            "type": rec_type,
+                            "id": ""
+                        }
+                        scanned_albums[key] = alb_info
+                        norm_art = normalize_text(artist_name)
+                        if norm_art:
+                            scanned_by_artist.setdefault(norm_art, []).append(alb_info)
+                        scanned_titles.add(normalize_text(album_name))
 
         with _LOCK:
             OWNED_ALBUMS = scanned_albums
@@ -622,7 +637,11 @@ def get_local_album_details(folder_path: str) -> dict:
     if not p.exists() or not p.is_dir():
         return None
 
-    audio_files = sorted([f for f in p.iterdir() if f.suffix.lower() in AUDIO_EXTS], key=lambda f: f.name)
+    audio_files = sorted([f for f in p.iterdir() if f.is_file() and f.suffix.lower() in AUDIO_EXTS], key=lambda f: f.name)
+    if not audio_files:
+        for sub in sorted(p.iterdir(), key=lambda d: d.name):
+            if sub.is_dir() and not is_ignored_path(sub):
+                audio_files.extend(sorted([f for f in sub.iterdir() if f.is_file() and f.suffix.lower() in AUDIO_EXTS], key=lambda f: f.name))
     tracks = []
     
     import urllib.parse

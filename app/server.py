@@ -93,11 +93,18 @@ def resolve_full_audio_stream(artist: str, title: str) -> dict:
         cookies_file = Path(__file__).parent.parent / "data" / "cookies.txt"
         
         stream_configs = []
+        # Tier 1: Fast zero-latency emulation (no browser locks)
+        opts_fast = dict(stream_opts)
+        opts_fast["extractor_args"] = {"youtube": {"player_client": ["web", "tv_embedded", "android", "ios"]}}
+        stream_configs.append(opts_fast)
+
+        # Tier 2: Verified offline cookies pool
         if cookies_file.exists():
             opts_cf = dict(stream_opts)
             opts_cf["cookiefile"] = str(cookies_file)
             stream_configs.append(opts_cf)
 
+        # Tier 3: Firefox / Edge fallback
         opts_ff = dict(stream_opts)
         opts_ff["cookiesfrombrowser"] = ("firefox",)
         stream_configs.append(opts_ff)
@@ -105,10 +112,6 @@ def resolve_full_audio_stream(artist: str, title: str) -> dict:
         opts_edge = dict(stream_opts)
         opts_edge["cookiesfrombrowser"] = ("edge",)
         stream_configs.append(opts_edge)
-
-        opts_mobile = dict(stream_opts)
-        opts_mobile["extractor_args"] = {"youtube": {"player_client": ["android", "ios"]}}
-        stream_configs.append(opts_mobile)
 
         for cfg in stream_configs:
             try:

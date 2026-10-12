@@ -811,15 +811,19 @@ class DownloadManager:
         def is_candidate_valid_duration(entry) -> bool:
             if not entry or not isinstance(entry, dict):
                 return False
+            # Guard against full album uploads and reaction videos masquerading as single songs
+            e_title = str(entry.get("title") or "").lower()
+            if any(k in e_title for k in ["full album", "album stream", "album review", "album reaction", "complete album", "full discography"]):
+                return False
             c_dur = entry.get("duration") or 0
             if not c_dur:
                 return True
             if expected_duration > 15:
-                max_allowed = max(expected_duration + 120, int(expected_duration * 1.6))
-                min_allowed = max(15, int(expected_duration * 0.4))
+                max_allowed = max(expected_duration + 90, int(expected_duration * 1.5))
+                min_allowed = max(15, int(expected_duration * 0.5))
                 if c_dur > max_allowed or c_dur < min_allowed:
                     return False
-            elif c_dur > 900:
+            elif c_dur > 720 or c_dur < 30:
                 return False
             return True
 
@@ -851,20 +855,26 @@ class DownloadManager:
         for cid in candidate_ids:
             success, err = _attempt_candidate_download(cid)
             if success and safe_out.exists() and safe_out.stat().st_size > 50000:
-                if expected_duration > 15:
-                    try:
-                        import mutagen
-                        m_chk = mutagen.File(str(safe_out))
-                        if m_chk and m_chk.info and m_chk.info.length:
-                            actual_dur = int(m_chk.info.length)
-                            max_dur = max(expected_duration + 120, int(expected_duration * 1.6))
-                            if actual_dur > max_dur:
-                                log_warn(f"    [DURATION GUARD] Downloaded candidate '{cid}' length ({actual_dur}s) vastly exceeds expected ({expected_duration}s). Rejecting...")
+                try:
+                    import mutagen
+                    m_chk = mutagen.File(str(safe_out))
+                    if m_chk and m_chk.info and m_chk.info.length:
+                        actual_dur = int(m_chk.info.length)
+                        if expected_duration > 15:
+                            max_dur = max(expected_duration + 90, int(expected_duration * 1.5))
+                            min_dur = max(15, int(expected_duration * 0.5))
+                            if actual_dur > max_dur or actual_dur < min_dur:
+                                log_warn(f"    [DURATION GUARD] Candidate '{cid}' duration ({actual_dur}s) violates expected ({expected_duration}s). Rejecting...")
                                 _cleanup_partial_artifacts()
                                 safe_out.unlink(missing_ok=True)
                                 continue
-                    except Exception:
-                        pass
+                        elif actual_dur > 720 or actual_dur < 30:
+                            log_warn(f"    [DURATION GUARD] Candidate '{cid}' abnormal duration ({actual_dur}s) without expected reference. Rejecting...")
+                            _cleanup_partial_artifacts()
+                            safe_out.unlink(missing_ok=True)
+                            continue
+                except Exception:
+                    pass
                 return
             last_err = err
             log_download(f"    [RETRY] Candidate '{cid}' failed. Trying next candidate...")
@@ -908,20 +918,26 @@ class DownloadManager:
             for cid in fallback_candidate_ids:
                 success, err = _attempt_candidate_download(cid)
                 if success and safe_out.exists() and safe_out.stat().st_size > 50000:
-                    if expected_duration > 15:
-                        try:
-                            import mutagen
-                            m_chk = mutagen.File(str(safe_out))
-                            if m_chk and m_chk.info and m_chk.info.length:
-                                actual_dur = int(m_chk.info.length)
-                                max_dur = max(expected_duration + 120, int(expected_duration * 1.6))
-                                if actual_dur > max_dur:
-                                    log_warn(f"    [DURATION GUARD] Fallback candidate '{cid}' length ({actual_dur}s) vastly exceeds expected ({expected_duration}s). Rejecting...")
+                    try:
+                        import mutagen
+                        m_chk = mutagen.File(str(safe_out))
+                        if m_chk and m_chk.info and m_chk.info.length:
+                            actual_dur = int(m_chk.info.length)
+                            if expected_duration > 15:
+                                max_dur = max(expected_duration + 90, int(expected_duration * 1.5))
+                                min_dur = max(15, int(expected_duration * 0.5))
+                                if actual_dur > max_dur or actual_dur < min_dur:
+                                    log_warn(f"    [DURATION GUARD] Fallback candidate '{cid}' duration ({actual_dur}s) violates expected ({expected_duration}s). Rejecting...")
                                     _cleanup_partial_artifacts()
                                     safe_out.unlink(missing_ok=True)
                                     continue
-                        except Exception:
-                            pass
+                            elif actual_dur > 720 or actual_dur < 30:
+                                log_warn(f"    [DURATION GUARD] Fallback candidate '{cid}' abnormal duration ({actual_dur}s) without expected reference. Rejecting...")
+                                _cleanup_partial_artifacts()
+                                safe_out.unlink(missing_ok=True)
+                                continue
+                    except Exception:
+                        pass
                     log_download(f"  [FALLBACK SUCCESS [OK]] Successfully recovered and downloaded '{title}' using fallback '{primary_art} - {core_title}'")
                     return
                 last_err = err

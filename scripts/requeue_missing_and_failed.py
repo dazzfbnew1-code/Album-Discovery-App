@@ -565,8 +565,8 @@ def main():
     )
     parser.add_argument(
         "--drive",
-        default=CONFIG.get("download_root") or CONFIG.get("music_root") or "H:\\",
-        help="Target music storage drive (default: H:\\)"
+        default=CONFIG.get("download_root") or CONFIG.get("music_root") or DEFAULT_DOWNLOAD_DIR,
+        help="Target music storage drive (default: configured music root)"
     )
     parser.add_argument(
         "--server",
